@@ -1,11 +1,11 @@
-class Chat {
+class ChatModel {
   final String name;
   final String lastMessage;
   final String imageUrl;
   final int unreadCount;
   final bool isOnline;
 
-  Chat({
+  ChatModel({
     required this.name,
     required this.lastMessage,
     required this.imageUrl,

@@ -5,8 +5,8 @@ import '../../data/models/chat_model.dart';
 import 'chat_detail_screen.dart';
 
 class ChatListScreen extends StatelessWidget {
-  final List<Chat> chats = [
-    Chat(
+  final List<ChatModel> chats = [
+    ChatModel(
       name: 'محمد علي',
       lastMessage: 'مرحبا! كيف الحال؟',
       imageUrl: 'https://placehold.co/150',
@@ -43,7 +43,7 @@ class ChatListScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildChatItem(BuildContext context, Chat chat) {
+  Widget _buildChatItem(BuildContext context, ChatModel chat) {
     return ListTile(
       leading: Stack(
         children: [

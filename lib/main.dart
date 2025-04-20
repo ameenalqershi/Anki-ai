@@ -1,9 +1,12 @@
+import 'package:english_mentor_ai2/injector.dart';
 import 'package:flutter/material.dart';
 
 import 'presentation/pages/chat_list_screen.dart';
 
 void main() {
+  setupDependencies();
   runApp(const MyApp());
+  
 }
 
 class MyApp extends StatelessWidget {

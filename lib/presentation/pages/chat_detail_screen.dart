@@ -1,79 +1,105 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:swipe_to/swipe_to.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
-import '../../data/models/chat_model.dart';
+
 import '../../data/models/message_model.dart';
+import '../../data/models/chat_model.dart';
+import '../../injector.dart';
+import '../../domain/repositories/chat_repository.dart';
 
 class ChatDetailScreen extends StatefulWidget {
-  final Chat chat;
-
-  const ChatDetailScreen(this.chat);
+  final ChatModel chat;
+  const ChatDetailScreen(this.chat, {Key? key}) : super(key: key);
 
   @override
   _ChatDetailScreenState createState() => _ChatDetailScreenState();
 }
 
 class _ChatDetailScreenState extends State<ChatDetailScreen> {
-  final List<Message> _messages = [];
+  final List<MessageModel> _messages = [];
   final TextEditingController _controller = TextEditingController();
   final ImagePicker _picker = ImagePicker();
   bool _showAttachments = false;
 
+  // Data repository
+  final ChatRepository _chatRepo = getIt<ChatRepository>();
+
   @override
   void initState() {
     super.initState();
-    _messages.addAll([
-      Message(
-        text: 'مرحبا! كيف الحال؟',
-        isMe: false,
-        time: '10:30 AM',
-      ),
-      Message(
-        text: 'كل شيء بخير، شكراً!',
-        isMe: true,
-        time: '10:31 AM',
-      ),
-    ]);
+    _loadMessages();
   }
 
-  void _toggleAttachments() {
-    setState(() => _showAttachments = !_showAttachments);
+  Future<void> _loadMessages() async {
+    // Fetch existing chat from local datasource
+    final msgs = await _chatRepo.getMessages(widget.chat.name);
+    if (msgs.isEmpty) {
+      // Optional: seed default messages if none exist
+      final defaults = [
+        MessageModel(text: 'مرحبا! كيف الحال؟', isMe: false, time: '10:30 AM'),
+        MessageModel(text: 'كل شيء بخير، شكراً!', isMe: true, time: '10:31 AM'),
+      ];
+      for (var m in defaults) {
+        await _chatRepo.sendMessage(widget.chat.name, m);
+      }
+    }
+    final loaded = await _chatRepo.getMessages(widget.chat.name);
+    setState(() {
+      _messages.clear();
+      _messages.addAll(loaded);
+    });
   }
 
   Future<void> _pickImage(ImageSource source) async {
     final XFile? image = await _picker.pickImage(source: source);
     if (image != null) {
-      _sendMessage(image.path, isImage: true);
+      _sendMessage(
+        image.path,
+        isImage: true,
+      );
     }
   }
 
   Future<void> _pickFile() async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles();
-    if (result != null) {
-      _sendMessage(result.files.single.path!, isFile: true);
+    final result = await FilePicker.platform.pickFiles();
+    if (result != null && result.files.single.path != null) {
+      _sendMessage(
+        result.files.single.path!,
+        isFile: true,
+      );
     }
   }
 
-  void _sendMessage(String text, {bool isImage = false, bool isFile = false}) {
+  Future<void> _sendMessage(String text,
+      {bool isImage = false, bool isFile = false}) async {
+              final now = DateTime.now().toLocal();
+  final formattedTime = DateFormat('h:mm a').format(now);  // مثلاً "10:30 AM"
+
+    final msg = MessageModel(
+      text: text,
+      isMe: true,
+      time: formattedTime,
+      isImage: isImage,
+      isFile: isFile,
+    );
+    await _chatRepo.sendMessage(widget.chat.name, msg);
     setState(() {
-      _messages.insert(0, Message(
-        text: text,
-        isMe: true,
-        time: 'الآن',
-        isImage: isImage,
-        isFile: isFile,
-      ));
-      _controller.clear();
+      _messages.insert(0, msg);
     });
+    _controller.clear();
   }
 
-  Widget _buildMessage(Message message) {
+  Widget _buildMessage(MessageModel message) {
     return SwipeTo(
-      onRightSwipe: (DragUpdateDetails details) => _showMessageOptions(message),
+      onRightSwipe: (details) => _showMessageOptions(message),
       child: Align(
-        alignment: message.isMe ? Alignment.centerRight : Alignment.centerLeft,
+        alignment:
+            message.isMe ? Alignment.centerRight : Alignment.centerLeft,
         child: Container(
           margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
           padding: const EdgeInsets.all(12),
@@ -85,7 +111,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (message.isImage)
-                Image.network(message.text, width: 200, height: 150)
+                Image.file(
+                  File(message.text),
+                  width: 200,
+                  height: 150,
+                )
               else if (message.isFile)
                 _buildFileMessage(message.text)
               else
@@ -115,7 +145,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('ملف مرفق', style: TextStyle(color: Colors.blue.shade800)),
-              Text(path.split('/').last, style: const TextStyle(fontSize: 12)),
+              Text(path.split('/').last,
+                  style: const TextStyle(fontSize: 12)),
             ],
           ),
         ),
@@ -123,10 +154,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     );
   }
 
-  void _showMessageOptions(Message message) {
+  void _showMessageOptions(MessageModel message) {
     showModalBottomSheet(
       context: context,
-      builder: (context) => Column(
+      builder: (_) => Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           ListTile(
@@ -141,7 +172,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           ),
           ListTile(
             leading: const Icon(Icons.delete, color: Colors.red),
-            title: const Text('حذف', style: TextStyle(color: Colors.red)),
+            title: const Text('حذف',
+                style: TextStyle(color: Colors.red)),
             onTap: () => Navigator.pop(context),
           ),
         ],
@@ -156,7 +188,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         title: Row(
           children: [
             CircleAvatar(
-              backgroundImage: CachedNetworkImageProvider(widget.chat.imageUrl),
+              backgroundImage:
+                  CachedNetworkImageProvider(widget.chat.imageUrl),
             ),
             const SizedBox(width: 12),
             Column(
@@ -172,7 +205,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           ],
         ),
         actions: [
-          IconButton(icon: const Icon(Icons.videocam), onPressed: () {}),
+          IconButton(
+              icon: const Icon(Icons.videocam), onPressed: () {}),
           IconButton(icon: const Icon(Icons.call), onPressed: () {}),
         ],
       ),
@@ -182,7 +216,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             child: ListView.builder(
               reverse: true,
               itemCount: _messages.length,
-              itemBuilder: (context, index) => _buildMessage(_messages[index]),
+              itemBuilder: (ctx, i) => _buildMessage(_messages[i]),
             ),
           ),
           _buildMessageInput(),
@@ -211,10 +245,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             children: [
               IconButton(
                 icon: Icon(
-                  _showAttachments ? Icons.close : Icons.add_circle_outline,
+                  _showAttachments
+                      ? Icons.close
+                      : Icons.add_circle_outline,
                   color: Colors.blue,
                 ),
-                onPressed: _toggleAttachments,
+                onPressed: () => setState(() => _showAttachments = !_showAttachments),
               ),
               Expanded(
                 child: TextField(
@@ -226,7 +262,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       borderSide: BorderSide.none,
                     ),
                     filled: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 16),
                   ),
                   maxLines: 5,
                   minLines: 1,
