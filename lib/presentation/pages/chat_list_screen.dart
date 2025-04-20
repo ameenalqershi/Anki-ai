@@ -12,6 +12,7 @@ class ChatListScreen extends StatelessWidget {
       imageUrl: 'https://placehold.co/150',
       unreadCount: 2,
       isOnline: true,
+      id: '55',
     ),
     // إضافة المزيد من الدردشات هنا
   ];
@@ -30,7 +31,7 @@ class ChatListScreen extends StatelessWidget {
         slivers: [
           SliverList(
             delegate: SliverChildBuilderDelegate(
-              (context, index) => _buildChatItem(context,chats[index]),
+              (context, index) => _buildChatItem(context, chat: chats[index]),
               childCount: chats.length,
             ),
           ),
@@ -43,7 +44,7 @@ class ChatListScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildChatItem(BuildContext context, ChatModel chat) {
+  Widget _buildChatItem(BuildContext context, {required ChatModel chat}) {
     return ListTile(
       leading: Stack(
         children: [
@@ -67,35 +68,43 @@ class ChatListScreen extends StatelessWidget {
             ),
         ],
       ),
-      title: Text(chat.name,
-          style: const TextStyle(fontWeight: FontWeight.bold)),
-      subtitle: Text(chat.lastMessage,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis),
+      title: Text(
+        chat.name,
+        style: const TextStyle(fontWeight: FontWeight.bold),
+      ),
+      subtitle: Text(
+        chat.lastMessage,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
       trailing: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text('10:30 AM',
-              style: TextStyle(
-                  color: Colors.grey.shade600,
-                  fontSize: 12)),
+          Text(
+            '10:30 AM',
+            style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+          ),
           if (chat.unreadCount > 0)
             Container(
               padding: const EdgeInsets.all(6),
               decoration: const BoxDecoration(
-                  color: Colors.blue, shape: BoxShape.circle),
-              child: Text(chat.unreadCount.toString(),
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12)),
+                color: Colors.blue,
+                shape: BoxShape.circle,
+              ),
+              child: Text(
+                chat.unreadCount.toString(),
+                style: const TextStyle(color: Colors.white, fontSize: 12),
+              ),
             ),
         ],
       ),
-      onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-              builder: (_) => ChatDetailScreen(chat))),
+      onTap:
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ChatDetailScreen(chat: chat, chatId: '12'),
+            ),
+          ),
     );
   }
 }
-

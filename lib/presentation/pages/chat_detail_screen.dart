@@ -1,180 +1,227 @@
-import 'dart:io';
-
+// lib/presentation/pages/chat_detail_screen.dart
+import 'package:english_mentor_ai2/data/models/message_model.dart';
+import 'package:english_mentor_ai2/domain/repositories/local_chat_data_source.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:swipe_to/swipe_to.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:file_picker/file_picker.dart';
-
-import '../../data/models/message_model.dart';
-import '../../data/models/chat_model.dart';
-import '../../injector.dart';
-import '../../domain/repositories/chat_repository.dart';
+import 'package:english_mentor_ai2/data/datasources/local/local_chat_data_source.dart';
+import 'package:english_mentor_ai2/data/models/chat_model.dart';
 
 class ChatDetailScreen extends StatefulWidget {
+  final String chatId;
   final ChatModel chat;
-  const ChatDetailScreen(this.chat, {Key? key}) : super(key: key);
+
+  const ChatDetailScreen({super.key, required this.chatId, required this.chat});
 
   @override
-  _ChatDetailScreenState createState() => _ChatDetailScreenState();
+  ChatDetailScreenState createState() => ChatDetailScreenState();
 }
 
-class _ChatDetailScreenState extends State<ChatDetailScreen> {
+class ChatDetailScreenState extends State<ChatDetailScreen> {
+  final LocalChatDataSource _dataSource = LocalChatDataSourceImpl();
+  final TextEditingController _messageController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   final List<MessageModel> _messages = [];
-  final TextEditingController _controller = TextEditingController();
-  final ImagePicker _picker = ImagePicker();
-  bool _showAttachments = false;
-
-  // Data repository
-  final ChatRepository _chatRepo = getIt<ChatRepository>();
+  final Map<DateTime, List<MessageModel>> _groupedMessages = {};
+  final List<DateTime> _dateSeparators = [];
+  int _currentPage = 0;
+  bool _hasMoreMessages = true;
 
   @override
   void initState() {
     super.initState();
-    _loadMessages();
+    _initializeChat();
+    _scrollController.addListener(_handleScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _initializeChat() async {
+    await _loadMessages();
+    _organizeMessages();
   }
 
   Future<void> _loadMessages() async {
-    // Fetch existing chat from local datasource
-    final msgs = await _chatRepo.getMessages(widget.chat.name);
-    if (msgs.isEmpty) {
-      // Optional: seed default messages if none exist
-      final defaults = [
-        MessageModel(text: 'مرحبا! كيف الحال؟', isMe: false, time: '10:30 AM'),
-        MessageModel(text: 'كل شيء بخير، شكراً!', isMe: true, time: '10:31 AM'),
-      ];
-      for (var m in defaults) {
-        await _chatRepo.sendMessage(widget.chat.name, m);
-      }
-    }
-    final loaded = await _chatRepo.getMessages(widget.chat.name);
+    final newMessages = await _dataSource.loadMessages(
+      chatId: widget.chat.id,
+      page: _currentPage,
+    );
+
     setState(() {
-      _messages.clear();
-      _messages.addAll(loaded);
+      _messages.addAll(newMessages);
+      _hasMoreMessages = newMessages.isNotEmpty;
     });
   }
 
-  Future<void> _pickImage(ImageSource source) async {
-    final XFile? image = await _picker.pickImage(source: source);
-    if (image != null) {
-      _sendMessage(
-        image.path,
-        isImage: true,
+  void _organizeMessages() {
+    _groupedMessages.clear();
+    _dateSeparators.clear();
+
+    DateTime? currentDate;
+    List<MessageModel> currentGroup = [];
+
+    for (final message in _messages.reversed) {
+      final date = DateTime(
+        message.timestamp.year,
+        message.timestamp.month,
+        message.timestamp.day,
       );
+
+      if (date != currentDate) {
+        if (currentGroup.isNotEmpty) {
+          _groupedMessages[date] = currentGroup;
+          _dateSeparators.add(date);
+        }
+        currentGroup = [];
+        currentDate = date;
+      }
+
+      if (currentGroup.isEmpty || currentGroup.last.isMe == message.isMe) {
+        currentGroup.add(message);
+      } else {
+        _groupedMessages[date] = currentGroup;
+        currentGroup = [message];
+      }
+    }
+
+    if (currentGroup.isNotEmpty) {
+      _groupedMessages[currentDate!] = currentGroup;
+      _dateSeparators.add(currentDate);
     }
   }
 
-  Future<void> _pickFile() async {
-    final result = await FilePicker.platform.pickFiles();
-    if (result != null && result.files.single.path != null) {
-      _sendMessage(
-        result.files.single.path!,
-        isFile: true,
-      );
+  void _handleScroll() {
+    if (_scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 200 &&
+        _hasMoreMessages) {
+      _currentPage++;
+      _loadMessages();
     }
   }
 
-  Future<void> _sendMessage(String text,
-      {bool isImage = false, bool isFile = false}) async {
-              final now = DateTime.now().toLocal();
-  final formattedTime = DateFormat('h:mm a').format(now);  // مثلاً "10:30 AM"
+  Future<void> _sendMessage() async {
+    final text = _messageController.text.trim();
+    if (text.isEmpty) return;
+    final now = DateTime.now().toLocal();
+    final formattedTime = DateFormat('h:mm a').format(now);
 
-    final msg = MessageModel(
+    final newMessage = MessageModel(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      chatId: widget.chat.id,
       text: text,
       isMe: true,
       time: formattedTime,
-      isImage: isImage,
-      isFile: isFile,
+      timestamp: DateTime.now(),
     );
-    await _chatRepo.sendMessage(widget.chat.name, msg);
-    setState(() {
-      _messages.insert(0, msg);
+
+    setState(() => _messages.add(newMessage));
+    _messageController.clear();
+    _organizeMessages();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
     });
-    _controller.clear();
+
+    await _dataSource.saveMessage(message: newMessage);
   }
 
-  Widget _buildMessage(MessageModel message) {
-    return SwipeTo(
-      onRightSwipe: (details) => _showMessageOptions(message),
-      child: Align(
-        alignment:
-            message.isMe ? Alignment.centerRight : Alignment.centerLeft,
+  Widget _buildDateDivider(DateTime date) {
+    final formattedDate = DateFormat.yMMMd().format(date);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Center(
         child: Container(
-          margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            color: message.isMe ? Colors.blue.shade100 : Colors.grey.shade200,
+            color: Colors.grey.withOpacity(0.2),
             borderRadius: BorderRadius.circular(16),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (message.isImage)
-                Image.file(
-                  File(message.text),
-                  width: 200,
-                  height: 150,
-                )
-              else if (message.isFile)
-                _buildFileMessage(message.text)
-              else
-                Text(message.text),
-              const SizedBox(height: 4),
-              Text(
-                message.time,
-                style: TextStyle(
-                  color: Colors.grey.shade600,
-                  fontSize: 10,
-                ),
-              ),
-            ],
+          child: Text(
+            formattedDate,
+            style: TextStyle(
+              color: Colors.grey[700],
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildFileMessage(String path) {
-    return Row(
-      children: [
-        const Icon(Icons.insert_drive_file, color: Colors.blue),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('ملف مرفق', style: TextStyle(color: Colors.blue.shade800)),
-              Text(path.split('/').last,
-                  style: const TextStyle(fontSize: 12)),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
+  Widget _buildMessageGroup(List<MessageModel> group) {
+    final isMe = group.first.isMe;
+    final showAvatar = !isMe && group.last == group.first;
 
-  void _showMessageOptions(MessageModel message) {
-    showModalBottomSheet(
-      context: context,
-      builder: (_) => Column(
-        mainAxisSize: MainAxisSize.min,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment:
+            isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
         children: [
-          ListTile(
-            leading: const Icon(Icons.reply),
-            title: const Text('رد'),
-            onTap: () => Navigator.pop(context),
-          ),
-          ListTile(
-            leading: const Icon(Icons.forward),
-            title: const Text('إعادة توجيه'),
-            onTap: () => Navigator.pop(context),
-          ),
-          ListTile(
-            leading: const Icon(Icons.delete, color: Colors.red),
-            title: const Text('حذف',
-                style: TextStyle(color: Colors.red)),
-            onTap: () => Navigator.pop(context),
+          if (showAvatar)
+            const CircleAvatar(
+              radius: 16,
+              backgroundImage: AssetImage('assets/default_avatar.png'),
+            ),
+          Flexible(
+            child: Column(
+              crossAxisAlignment:
+                  isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              children:
+                  group.map((message) {
+                    final isFirst = message == group.first;
+                    final isLast = message == group.last;
+
+                    return Container(
+                      constraints: const BoxConstraints(maxWidth: 280),
+                      margin: EdgeInsets.only(
+                        left: isMe ? 40 : (showAvatar ? 8 : 40),
+                        right: isMe ? 8 : 40,
+                        bottom: 4,
+                      ),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isMe ? Colors.blueAccent : Colors.grey[200],
+                        borderRadius: BorderRadius.only(
+                          topLeft: const Radius.circular(16),
+                          topRight: const Radius.circular(16),
+                          bottomLeft: Radius.circular(isLast ? 16 : 4),
+                          bottomRight: Radius.circular(isLast ? 16 : 4),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            message.text,
+                            style: TextStyle(
+                              color: isMe ? Colors.white : Colors.black,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            DateFormat.Hm().format(message.timestamp),
+                            style: TextStyle(
+                              color: isMe ? Colors.white70 : Colors.grey[600],
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+            ),
           ),
         ],
       ),
@@ -185,39 +232,37 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          children: [
-            CircleAvatar(
-              backgroundImage:
-                  CachedNetworkImageProvider(widget.chat.imageUrl),
-            ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(widget.chat.name),
-                Text(
-                  'متصل الآن',
-                  style: TextStyle(fontSize: 12, color: Colors.green),
-                ),
-              ],
-            ),
-          ],
-        ),
+        title: Text(widget.chat.name),
         actions: [
           IconButton(
-              icon: const Icon(Icons.videocam), onPressed: () {}),
-          IconButton(icon: const Icon(Icons.call), onPressed: () {}),
+            icon: const Icon(Icons.more_vert),
+            onPressed: () => _showChatOptions(context),
+          ),
         ],
       ),
       body: Column(
         children: [
           Expanded(
-            child: ListView.builder(
-              reverse: true,
-              itemCount: _messages.length,
-              itemBuilder: (ctx, i) => _buildMessage(_messages[i]),
-            ),
+            child:
+                _messages.isEmpty
+                    ? const Center(child: Text('ابدأ المحادثة الآن'))
+                    : ListView.builder(
+                      controller: _scrollController,
+                      reverse: true,
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.all(8),
+                      itemCount: _dateSeparators.length * 2,
+                      itemBuilder: (context, index) {
+                        if (index.isOdd) {
+                          final dateIndex = index ~/ 2;
+                          return _buildDateDivider(_dateSeparators[dateIndex]);
+                        }
+                        final groupIndex = index ~/ 2;
+                        return _buildMessageGroup(
+                          _groupedMessages[_dateSeparators[groupIndex]]!,
+                        );
+                      },
+                    ),
           ),
           _buildMessageInput(),
         ],
@@ -226,122 +271,92 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   }
 
   Widget _buildMessageInput() {
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
-            blurRadius: 8,
-            offset: const Offset(0, -4),
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.attach_file),
+            onPressed: _handleAttachment,
           ),
+          Expanded(
+            child: TextField(
+              controller: _messageController,
+              minLines: 1,
+              maxLines: 5,
+              textInputAction: TextInputAction.send,
+              onSubmitted: (_) => _sendMessage(),
+              decoration: InputDecoration(
+                hintText: 'اكتب رسالة...',
+                filled: true,
+                fillColor: Colors.grey[100],
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(24),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+              ),
+            ),
+          ),
+          IconButton(icon: const Icon(Icons.send), onPressed: _sendMessage),
         ],
       ),
-      child: Column(
-        children: [
-          if (_showAttachments) _buildAttachmentsMenu(),
-          Row(
+    );
+  }
+
+  void _showChatOptions(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder:
+          (context) => Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              IconButton(
-                icon: Icon(
-                  _showAttachments
-                      ? Icons.close
-                      : Icons.add_circle_outline,
-                  color: Colors.blue,
-                ),
-                onPressed: () => setState(() => _showAttachments = !_showAttachments),
-              ),
-              Expanded(
-                child: TextField(
-                  controller: _controller,
-                  decoration: InputDecoration(
-                    hintText: 'اكتب رسالة...',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24),
-                      borderSide: BorderSide.none,
-                    ),
-                    filled: true,
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 16),
-                  ),
-                  maxLines: 5,
-                  minLines: 1,
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.send, color: Colors.blue),
-                onPressed: () {
-                  if (_controller.text.isNotEmpty) {
-                    _sendMessage(_controller.text);
-                  }
-                },
+              ListTile(
+                leading: const Icon(Icons.delete),
+                title: const Text('حذف المحادثة'),
+                onTap: () => _deleteChat(context),
               ),
             ],
           ),
-        ],
-      ),
     );
   }
 
-  Widget _buildAttachmentsMenu() {
-    return Container(
-      height: 100,
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        children: [
-          _buildAttachmentOption(
-            icon: Icons.photo_library,
-            label: 'المعرض',
-            onTap: () => _pickImage(ImageSource.gallery),
-          ),
-          _buildAttachmentOption(
-            icon: Icons.camera_alt,
-            label: 'الكاميرا',
-            onTap: () => _pickImage(ImageSource.camera),
-          ),
-          _buildAttachmentOption(
-            icon: Icons.attach_file,
-            label: 'ملف',
-            onTap: _pickFile,
-          ),
-        ],
-      ),
-    );
+  Future<void> _deleteChat(BuildContext context) async {
+    // await _dataSource.deleteChat(widget.chatId);
+    // Navigator.pop(context);
+    // Navigator.pop(context);
   }
 
-  Widget _buildAttachmentOption({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        width: 80,
-        padding: const EdgeInsets.all(8),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: Colors.blue.shade100,
-                borderRadius: BorderRadius.circular(24),
+  void _handleAttachment() {
+    showModalBottomSheet(
+      context: context,
+      builder:
+          (context) => Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.image),
+                title: const Text('صورة'),
+                onTap: () => _sendImage(),
               ),
-              child: Icon(icon, color: Colors.blue),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: const TextStyle(fontSize: 12),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
+              ListTile(
+                leading: const Icon(Icons.insert_drive_file),
+                title: const Text('ملف'),
+                onTap: () => _sendFile(),
+              ),
+            ],
+          ),
     );
+  }
+
+  Future<void> _sendImage() async {
+    // إضافة منطق اختيار الصورة هنا
+  }
+
+  Future<void> _sendFile() async {
+    // إضافة منطق اختيار الملف هنا
   }
 }
