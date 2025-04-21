@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum MessageType { text, image, video, audio, file, voice }
+enum MessageType { text, image, video, audio, file, voice, code, system }
 
 class ChatMessage {
   final String id;
@@ -15,6 +15,7 @@ class ChatMessage {
   final String? replyToMessageId;
   final String? fileName;
   final int? fileSize;
+  final String? replyTo;
 
   ChatMessage({
     required this.id,
@@ -29,6 +30,7 @@ class ChatMessage {
     this.replyToMessageId,
     this.fileName,
     this.fileSize,
+    this.replyTo,
   });
 
   ChatMessage copyWith({
@@ -44,6 +46,7 @@ class ChatMessage {
     String? replyToMessageId,
     String? fileName,
     int? fileSize,
+    String? replyTo,
   }) {
     return ChatMessage(
       id: id ?? this.id,
@@ -58,12 +61,13 @@ class ChatMessage {
       replyToMessageId: replyToMessageId ?? this.replyToMessageId,
       fileName: fileName ?? this.fileName,
       fileSize: fileSize ?? this.fileSize,
+      replyTo: replyTo ?? this.replyTo,
     );
   }
 }
 
 class LocalChatDataSource extends ChangeNotifier {
-  final List<ChatMessage> _messages = [];
+  final List<ChatMessage> messages;
   ChatMessage? _pinnedMessage;
   String? _typingUser;
   String? _onlineStatus;
@@ -77,38 +81,153 @@ class LocalChatDataSource extends ChangeNotifier {
   final TextEditingController inputController = TextEditingController();
   final TextEditingController searchController = TextEditingController();
 
-  List<ChatMessage> get messages => List.unmodifiable(_messages);
   ChatMessage? get pinnedMessage => _pinnedMessage;
   String? get typingUser => _typingUser;
   String? get onlineStatus => _onlineStatus;
   int? get searchIndex => _searchIndex;
   List<int> get searchResults => List.unmodifiable(_searchResults);
-  String get statusText => _onlineStatus ?? "";
+  String get statusText => _onlineStatus ?? "متصل الآن";
   bool get isSearching => searchController.text.isNotEmpty;
 
+  LocalChatDataSource._(this.messages);
+
+  factory LocalChatDataSource.demo() {
+    final now = DateTime.now();
+    return LocalChatDataSource._([
+      ChatMessage(
+        id: "sys1",
+        text: "تم تفعيل ميزة إرسال الصور والصوتيات!",
+        isMe: false,
+        createdAt: now.subtract(const Duration(minutes: 30)),
+        type: MessageType.system,
+      ),
+      ChatMessage(
+        id: "msg1",
+        text: "مرحباً بك في محادثة العينة 🎉",
+        isMe: false,
+        createdAt: now.subtract(const Duration(minutes: 28)),
+        type: MessageType.text,
+      ),
+      // صور مجمعة لمستخدم واحد
+      ChatMessage(
+        id: "img1",
+        text: "",
+        mediaUrl:
+            "https://images.unsplash.com/photo-1506744038136-46273834b3fb",
+        isMe: true,
+        createdAt: now.subtract(const Duration(minutes: 27)),
+        type: MessageType.image,
+      ),
+      ChatMessage(
+        id: "img2",
+        text: "",
+        mediaUrl:
+            "https://images.unsplash.com/photo-1519125323398-675f0ddb6308",
+        isMe: true,
+        createdAt: now.subtract(const Duration(minutes: 27)),
+        type: MessageType.image,
+      ),
+      ChatMessage(
+        id: "img3",
+        text: "",
+        mediaUrl:
+            "https://images.unsplash.com/photo-1465101046530-73398c7f28ca",
+        isMe: true,
+        createdAt: now.subtract(const Duration(minutes: 27)),
+        type: MessageType.image,
+      ),
+      // صورة منفصلة
+      ChatMessage(
+        id: "img4",
+        text: "",
+        mediaUrl:
+            "https://images.unsplash.com/photo-1506744038136-46273834b3fb",
+        isMe: false,
+        createdAt: now.subtract(const Duration(minutes: 25)),
+        type: MessageType.image,
+      ),
+      // رسالة صوتية
+      ChatMessage(
+        id: "voice1",
+        text: "",
+        mediaUrl:
+            "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+        isMe: false,
+        createdAt: now.subtract(const Duration(minutes: 24)),
+        type: MessageType.voice,
+      ),
+      // رسالة فيديو
+      ChatMessage(
+        id: "vid1",
+        text: "",
+        mediaUrl:
+            "https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4",
+        isMe: true,
+        createdAt: now.subtract(const Duration(minutes: 23)),
+        type: MessageType.video,
+      ),
+      // رسالة ملف
+      ChatMessage(
+        id: "file1",
+        text: "",
+        fileName: "وثيقة.pdf",
+        fileSize: 204800,
+        isMe: false,
+        createdAt: now.subtract(const Duration(minutes: 22)),
+        type: MessageType.file,
+      ),
+      // رسالة كود برمجي
+      ChatMessage(
+        id: "code1",
+        text: "```dart\nvoid main() {\n  print('Hello, World!');\n}\n```",
+        isMe: false,
+        createdAt: now.subtract(const Duration(minutes: 21)),
+        type: MessageType.code,
+      ),
+      // رسالة نصية طويلة
+      ChatMessage(
+        id: "longtext",
+        text:
+            "هذه رسالة نصية طويلة للاختبار. الهدف منها التأكد من عرض الرسائل الطويلة بشكل صحيح دون مشاكل.",
+        isMe: true,
+        createdAt: now.subtract(const Duration(minutes: 20)),
+        type: MessageType.text,
+      ),
+      // رسالة رد
+      ChatMessage(
+        id: "reply1",
+        text: "👍 شكراً على الرسالة السابقة!",
+        isMe: false,
+        createdAt: now.subtract(const Duration(minutes: 19)),
+        type: MessageType.text,
+        replyTo: "longtext",
+      ),
+    ]);
+  }
+
   void addMessage(ChatMessage msg) {
-    _messages.add(msg);
+    messages.add(msg);
     notifyListeners();
   }
 
   void deleteMessage(String id) {
-    final idx = _messages.indexWhere((m) => m.id == id);
+    final idx = messages.indexWhere((m) => m.id == id);
     if (idx != -1) {
-      _messages[idx] = _messages[idx].copyWith(isDeleted: true, text: "");
+      messages[idx] = messages[idx].copyWith(isDeleted: true, text: "");
       notifyListeners();
     }
   }
 
   void editMessage(String id, String newText) {
-    final idx = _messages.indexWhere((m) => m.id == id);
+    final idx = messages.indexWhere((m) => m.id == id);
     if (idx != -1) {
-      _messages[idx] = _messages[idx].copyWith(text: newText, isEdited: true);
+      messages[idx] = messages[idx].copyWith(text: newText, isEdited: true);
       notifyListeners();
     }
   }
 
   void pinMessage(String id) {
-    final msg = _messages.firstWhere(
+    final msg = messages.firstWhere(
       (m) => m.id == id,
       orElse: () => throw Exception("Message not found"),
     );
@@ -138,8 +257,8 @@ class LocalChatDataSource extends ChangeNotifier {
       notifyListeners();
       return _searchResults;
     }
-    for (int i = 0; i < _messages.length; i++) {
-      final msg = _messages[i];
+    for (int i = 0; i < messages.length; i++) {
+      final msg = messages[i];
       if (!msg.isDeleted &&
           ((msg.text.toLowerCase().contains(query.toLowerCase())) ||
               (msg.mediaUrl != null &&
@@ -194,7 +313,7 @@ class LocalChatDataSource extends ChangeNotifier {
   }
 
   List<ChatMessage> messagesOfDay(DateTime day) {
-    return _messages
+    return messages
         .where(
           (msg) =>
               msg.createdAt.year == day.year &&
@@ -259,11 +378,11 @@ class LocalChatDataSource extends ChangeNotifier {
     if (_isLoading) return;
     _isLoading = true;
     await Future.delayed(const Duration(milliseconds: 800));
-    _messages.clear();
+    messages.clear();
 
     final now = DateTime.now();
     for (int i = 0; i < 20; i++) {
-      _messages.add(
+      messages.add(
         ChatMessage(
           id: (1000 + i).toString(),
           text: "رسالة رقم ${i + 1}",
@@ -285,8 +404,8 @@ class LocalChatDataSource extends ChangeNotifier {
     await Future.delayed(const Duration(milliseconds: 800));
 
     final oldest =
-        _messages.isNotEmpty ? _messages.first.createdAt : DateTime.now();
-    final currentCount = _messages.length;
+        messages.isNotEmpty ? messages.first.createdAt : DateTime.now();
+    final currentCount = messages.length;
     List<ChatMessage> older = [];
     for (int i = 0; i < 20; i++) {
       older.add(
@@ -299,14 +418,14 @@ class LocalChatDataSource extends ChangeNotifier {
         ),
       );
     }
-    _messages.insertAll(0, older);
-    if (_messages.length >= 100) _hasMore = false;
+    messages.insertAll(0, older);
+    if (messages.length >= 100) _hasMore = false;
     _isLoading = false;
     notifyListeners();
   }
 
   void reset() {
-    _messages.clear();
+    messages.clear();
     _pinnedMessage = null;
     _typingUser = null;
     _onlineStatus = null;
