@@ -1,29 +1,35 @@
 import 'package:flutter/material.dart';
-import 'package:english_mentor_ai2/data/local_data_source.dart';
 
-class ChatInputBar extends StatelessWidget {
-  final LocalChatDataSource dataSource;
-  final VoidCallback? onSend;
-  const ChatInputBar({Key? key, required this.dataSource, this.onSend})
-    : super(key: key);
+class ChatInputBar extends StatefulWidget {
+  final Function(String) onSend;
+
+  const ChatInputBar({Key? key, required this.onSend}) : super(key: key);
+
+  @override
+  State<ChatInputBar> createState() => _ChatInputBarState();
+}
+
+class _ChatInputBarState extends State<ChatInputBar> {
+  final TextEditingController _controller = TextEditingController();
+
+  void _handleSend() {
+    final text = _controller.text.trim();
+    if (text.isNotEmpty) {
+      widget.onSend(text); // هنا لن تحتاج as String لأن النوع صحيح
+      _controller.clear();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       color: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       child: Row(
         children: [
-          IconButton(
-            icon: const Icon(Icons.emoji_emotions_outlined, color: Colors.grey),
-            onPressed: () {
-              dataSource.sendInputMessage();
-              if (onSend != null) onSend!();
-            },
-          ),
           Expanded(
             child: TextField(
-              controller: dataSource.inputController,
+              controller: _controller,
               minLines: 1,
               maxLines: 4,
               textDirection: TextDirection.rtl,
@@ -32,11 +38,11 @@ class ChatInputBar extends StatelessWidget {
                 border: InputBorder.none,
                 contentPadding: EdgeInsets.symmetric(vertical: 8),
               ),
-              onSubmitted: (_) => dataSource.sendInputMessage(),
+              onSubmitted: (_) => _handleSend(),
             ),
           ),
           GestureDetector(
-            onTap: dataSource.sendInputMessage,
+            onTap: _handleSend,
             child: CircleAvatar(
               backgroundColor: const Color(0xff63aee1),
               radius: 22,

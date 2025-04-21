@@ -5,11 +5,11 @@ import 'media_viewer.dart';
 
 class ChatMessageBubble extends StatelessWidget {
   final ChatMessage msg;
-  final LocalChatDataSource dataSource;
+  // final LocalChatDataSource dataSource;
   const ChatMessageBubble({
     super.key,
     required this.msg,
-    required this.dataSource,
+    // required this.dataSource,
   });
 
   @override

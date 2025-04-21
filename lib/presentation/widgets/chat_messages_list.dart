@@ -19,7 +19,7 @@ class ChatMessagesList extends StatelessWidget {
       itemBuilder: (ctx, idx) {
         final group = grouped[grouped.length - 1 - idx];
         if (group.length == 1 && group.first.type != data.MessageType.image) {
-          return ChatMessageBubble(msg: group.first, dataSource: dataSource);
+          return ChatMessageBubble(msg: group.first);
         } else if (group.length >= 1 &&
             group.first.type == data.MessageType.image) {
           return ChatGroupedImagesBubble(images: group, isMe: group.first.isMe);

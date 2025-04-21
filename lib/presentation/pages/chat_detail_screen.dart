@@ -945,7 +945,6 @@ import 'package:english_mentor_ai2/presentation/widgets/chat_grouped_images.dart
 import 'package:english_mentor_ai2/presentation/widgets/chat_input_bar.dart';
 import 'package:english_mentor_ai2/presentation/widgets/chat_message_bubble.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart' as intl;
 import 'package:english_mentor_ai2/data/local_data_source.dart';
 
 class TelegramChatScreen extends StatefulWidget {
@@ -959,21 +958,44 @@ class _TelegramChatScreenState extends State<TelegramChatScreen> {
   final LocalChatDataSource dataSource = LocalChatDataSource();
   final ScrollController _scrollController = ScrollController();
   bool _firstLoad = true;
+  bool _loadingMore = false;
 
   @override
   void initState() {
     super.initState();
-    dataSource.loadInitialMessages().then(
-      (_) => setState(() => _firstLoad = false),
-    );
+    dataSource.loadInitialMessages().then((_) {
+      setState(() => _firstLoad = false);
+      // بعد أول تحميل، انتقل للأسفل مباشرة (آخر رسالة)
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+        }
+      });
+    });
     _scrollController.addListener(_onScroll);
   }
 
-  void _onScroll() {
-    if (_scrollController.position.pixels >=
-            _scrollController.position.maxScrollExtent - 120 &&
-        dataSource.hasMore) {
-      dataSource.loadMoreMessages();
+  void _onScroll() async {
+    // إذا وصل المستخدم إلى الأعلى وحالة التحميل متاحة
+    if (_scrollController.position.pixels <= 120 &&
+        dataSource.hasMore &&
+        !_loadingMore) {
+      setState(() => _loadingMore = true);
+
+      // قبل التحميل: احتفظ بارتفاع القائمة
+      final beforeMax = _scrollController.position.maxScrollExtent;
+      final beforeOffset = _scrollController.offset;
+
+      await dataSource.loadMoreMessages();
+      await Future.delayed(const Duration(milliseconds: 20)); // لإكمال البناء
+
+      // بعد التحميل: احسب الفرق وعوضه
+      final afterMax = _scrollController.position.maxScrollExtent;
+      if (_scrollController.hasClients) {
+        final delta = afterMax - beforeMax;
+        _scrollController.jumpTo(beforeOffset + delta);
+      }
+      setState(() => _loadingMore = false);
     }
   }
 
@@ -1005,45 +1027,59 @@ class _TelegramChatScreenState extends State<TelegramChatScreen> {
         child: AnimatedBuilder(
           animation: dataSource,
           builder: (context, _) {
-            if (_firstLoad)
+            if (_firstLoad) {
               return const Center(child: CircularProgressIndicator());
-            final grouped = groupImageMessages(dataSource.messages);
+            }
+            final messages = dataSource.messages;
             return Column(
               children: [
+                // شريط تحميل صغير يظهر أعلى الرسائل عند التحميل
+                if (_loadingMore)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8, bottom: 4),
+                    child: SizedBox(
+                      height: 24,
+                      width: 24,
+                      child: Center(
+                        child: SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+                    ),
+                  ),
                 Expanded(
                   child: ListView.builder(
                     controller: _scrollController,
-                    reverse: true,
+                    reverse: false, // ترتيب: الأقدم في الأعلى، الأحدث في الأسفل
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    itemCount: grouped.length,
+                    itemCount: messages.length,
                     itemBuilder: (ctx, idx) {
-                      final group = grouped[grouped.length - 1 - idx];
-                      if (group.length == 1 &&
-                          group.first.type != MessageType.image) {
-                        return ChatMessageBubble(
-                          msg: group.first,
-                          dataSource: dataSource,
-                        );
-                      } else if (group.length >= 1 &&
-                          group.first.type == MessageType.image) {
-                        return ChatGroupedImagesBubble(
-                          images: group,
-                          isMe: group.first.isMe,
-                        );
-                      }
-                      return const SizedBox.shrink();
+                      final msg = messages[idx];
+                      return ChatMessageBubble(msg: msg);
                     },
                   ),
                 ),
                 ChatInputBar(
-                  dataSource: dataSource,
-                  onSend: () {
-                    Future.delayed(const Duration(milliseconds: 100), () {
-                      _scrollController.animateTo(
-                        0,
-                        duration: const Duration(milliseconds: 400),
-                        curve: Curves.easeOut,
-                      );
+                  onSend: (text) {
+                    dataSource.addMessage(
+                      ChatMessage(
+                        id: DateTime.now().millisecondsSinceEpoch.toString(),
+                        text: text as String,
+                        isMe: true,
+                        createdAt: DateTime.now(),
+                        type: MessageType.text,
+                      ),
+                    );
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (_scrollController.hasClients) {
+                        _scrollController.animateTo(
+                          _scrollController.position.maxScrollExtent,
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeOut,
+                        );
+                      }
                     });
                   },
                 ),

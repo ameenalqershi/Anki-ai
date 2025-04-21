@@ -14,7 +14,7 @@ class ChatMessage {
   final bool isPinned;
   final String? replyToMessageId;
   final String? fileName;
-  final int? fileSize; // in bytes
+  final int? fileSize;
 
   ChatMessage({
     required this.id,
@@ -22,14 +22,14 @@ class ChatMessage {
     this.mediaUrl,
     this.type = MessageType.text,
     this.isMe = false,
-    DateTime? createdAt,
+    required this.createdAt,
     this.isDeleted = false,
     this.isEdited = false,
     this.isPinned = false,
     this.replyToMessageId,
     this.fileName,
     this.fileSize,
-  }) : createdAt = createdAt ?? DateTime.now();
+  });
 
   ChatMessage copyWith({
     String? id,
@@ -70,16 +70,13 @@ class LocalChatDataSource extends ChangeNotifier {
   int? _searchIndex;
   List<int> _searchResults = [];
 
-  // Paging state
   bool _hasMore = true;
   bool get hasMore => _hasMore;
   bool _isLoading = false;
 
-  // Controllers for UI
   final TextEditingController inputController = TextEditingController();
   final TextEditingController searchController = TextEditingController();
 
-  // ---- Getters ----
   List<ChatMessage> get messages => List.unmodifiable(_messages);
   ChatMessage? get pinnedMessage => _pinnedMessage;
   String? get typingUser => _typingUser;
@@ -89,9 +86,8 @@ class LocalChatDataSource extends ChangeNotifier {
   String get statusText => _onlineStatus ?? "";
   bool get isSearching => searchController.text.isNotEmpty;
 
-  // ---- الرسائل ----
   void addMessage(ChatMessage msg) {
-    _messages.insert(0, msg); // الأحدث في الأعلى (مثل معظم تطبيقات الشات)
+    _messages.add(msg);
     notifyListeners();
   }
 
@@ -111,7 +107,6 @@ class LocalChatDataSource extends ChangeNotifier {
     }
   }
 
-  // ---- تثبيت الرسائل ----
   void pinMessage(String id) {
     final msg = _messages.firstWhere(
       (m) => m.id == id,
@@ -126,7 +121,6 @@ class LocalChatDataSource extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ---- حالة الكتابة/الاتصال ----
   void setTypingUser(String? user) {
     _typingUser = user;
     notifyListeners();
@@ -137,7 +131,6 @@ class LocalChatDataSource extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ---- البحث ----
   List<int> searchMessages(String query) {
     _searchResults = [];
     if (query.trim().isEmpty) {
@@ -200,7 +193,6 @@ class LocalChatDataSource extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ---- رسائل في يوم محدد ----
   List<ChatMessage> messagesOfDay(DateTime day) {
     return _messages
         .where(
@@ -212,7 +204,6 @@ class LocalChatDataSource extends ChangeNotifier {
         .toList();
   }
 
-  // ---- إرسال رسالة نصية من الإدخال ----
   void sendInputMessage({bool isMe = true, VoidCallback? onSend}) {
     final text = inputController.text.trim();
     if (text.isEmpty) return;
@@ -228,7 +219,6 @@ class LocalChatDataSource extends ChangeNotifier {
     if (onSend != null) onSend();
   }
 
-  // ---- إرسال ملف ----
   void sendFileMessage({
     required String fileName,
     required int fileSize,
@@ -248,7 +238,6 @@ class LocalChatDataSource extends ChangeNotifier {
     addMessage(msg);
   }
 
-  // ---- إرسال رسالة صوتية ----
   void sendVoiceMessage({
     required String voiceUrl,
     required int durationMs,
@@ -265,53 +254,57 @@ class LocalChatDataSource extends ChangeNotifier {
     addMessage(msg);
   }
 
-  // ---- تحميل أول مجموعة رسائل (مثلاً عند فتح الشات) ----
+  /// تحميل أول دفعة: الأقدم في الأعلى، الأحدث في الأسفل
   Future<void> loadInitialMessages() async {
     if (_isLoading) return;
     _isLoading = true;
     await Future.delayed(const Duration(milliseconds: 800));
     _messages.clear();
-    // أضف رسائل وهمية للاختبار/الديمو!
+
+    final now = DateTime.now();
     for (int i = 0; i < 20; i++) {
       _messages.add(
         ChatMessage(
           id: (1000 + i).toString(),
           text: "رسالة رقم ${i + 1}",
           isMe: i % 2 == 0,
-          createdAt: DateTime.now().subtract(Duration(minutes: i * 3)),
+          createdAt: now.subtract(Duration(minutes: (19 - i) * 3)),
           type: MessageType.text,
         ),
       );
     }
-    _hasMore = true; // إذا كان هناك المزيد من الرسائل
     _isLoading = false;
+    _hasMore = true;
     notifyListeners();
   }
 
-  // ---- تحميل المزيد من الرسائل (مثلاً عند السحب للأعلى) ----
+  /// تحميل المزيد عند السحب للأعلى: أضف الرسائل الأقدم في الأعلى (index 0)
   Future<void> loadMoreMessages() async {
     if (_isLoading || !_hasMore) return;
     _isLoading = true;
     await Future.delayed(const Duration(milliseconds: 800));
-    int current = _messages.length;
-    for (int i = current; i < current + 20; i++) {
-      _messages.add(
+
+    final oldest =
+        _messages.isNotEmpty ? _messages.first.createdAt : DateTime.now();
+    final currentCount = _messages.length;
+    List<ChatMessage> older = [];
+    for (int i = 0; i < 20; i++) {
+      older.add(
         ChatMessage(
-          id: (1000 + i).toString(),
-          text: "رسالة قديمة رقم ${i + 1}",
-          isMe: i % 2 == 0,
-          createdAt: DateTime.now().subtract(Duration(minutes: i * 3)),
+          id: (2000 + currentCount + i).toString(),
+          text: "رسالة قديمة رقم ${currentCount + i + 1}",
+          isMe: (currentCount + i) % 2 == 0,
+          createdAt: oldest.subtract(Duration(minutes: (20 - i) * 3)),
           type: MessageType.text,
         ),
       );
     }
-    // أوقف التحميل بعد 100 رسالة (مثال فقط)
+    _messages.insertAll(0, older);
     if (_messages.length >= 100) _hasMore = false;
     _isLoading = false;
     notifyListeners();
   }
 
-  // ---- إعادة تعيين البيانات ----
   void reset() {
     _messages.clear();
     _pinnedMessage = null;
@@ -326,24 +319,3 @@ class LocalChatDataSource extends ChangeNotifier {
     notifyListeners();
   }
 }
-
-// تجميع رسائل الصور المتتالية
-// List<List<ChatMessage>> groupImageMessages(List<ChatMessage> messages) {
-//   final List<List<ChatMessage>> grouped = [];
-//   List<ChatMessage> currentGroup = [];
-//   for (final msg in messages) {
-//     if (msg.type == MessageType.image && !msg.isDeleted) {
-//       currentGroup.add(msg);
-//     } else {
-//       if (currentGroup.isNotEmpty) {
-//         grouped.add(List<ChatMessage>.from(currentGroup));
-//         currentGroup.clear();
-//       }
-//       grouped.add([msg]);
-//     }
-//   }
-//   if (currentGroup.isNotEmpty) {
-//     grouped.add(currentGroup);
-//   }
-//   return grouped;
-// }
