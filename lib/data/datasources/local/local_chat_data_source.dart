@@ -4,32 +4,24 @@ import 'package:english_mentor_ai2/data/models/message_model.dart';
 import 'package:english_mentor_ai2/domain/repositories/local_chat_data_source.dart';
 
 class LocalChatDataSourceImpl implements LocalChatDataSource {
-  final List<MessageModel> _messages = [
-    MessageModel(
-      id: '1',
-      chatId: '55',
-      text: 'how are you',
-      isMe: false,
-      time: '10:25 AM',
-      timestamp: DateTime.now(),
-    ),
-    MessageModel(
-      id: '2',
-      chatId: '55',
-      text: 'am good',
-      isMe: true,
-      time: '10:25 AM',
-      timestamp: DateTime.now(),
-    ),
-    MessageModel(
-      id: '3',
-      chatId: '55',
-      text: 'what are you doing',
-      isMe: false,
-      time: '10:26 AM',
-      timestamp: DateTime.now(),
-    ),
-  ];
+  final List<MessageModel> _messages = [];
+
+  LocalChatDataSourceImpl() {
+    // Generate dummy data
+    final now = DateTime.now();
+    for (int i = 0; i < 50; i++) {
+      _messages.add(
+        MessageModel(
+          id: i.toString(),
+          text: 'how are you ${i + 1}',
+          isMe: i % 3 == 0,
+          timestamp: now.subtract(Duration(hours: i)),
+          chatId: '55',
+          time: '10:20 AM',
+        ),
+      );
+    }
+  }
 
   @override
   Future<List<MessageModel>> loadMessages({
@@ -40,10 +32,17 @@ class LocalChatDataSourceImpl implements LocalChatDataSource {
     final start = page * pageSize;
     final end = start + pageSize;
 
-    return _messages
-        .where((m) => m.chatId == chatId)
-        .toList()
-        .sublist(start, end > _messages.length ? _messages.length : end);
+    final filtered =
+        _messages
+            .where((m) => m.chatId == chatId)
+            .toList()
+            .reversed // ترتيب من الأحدث إلى الأقدم
+            .toList();
+
+    return filtered.sublist(
+      start,
+      end > filtered.length ? filtered.length : end,
+    );
   }
 
   @override
