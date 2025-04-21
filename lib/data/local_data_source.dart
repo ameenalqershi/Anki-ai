@@ -21,9 +21,9 @@ class ChatMessage {
   final String? sender; // اسم المرسل (اختياري)
   final String? avatarUrl; // صورة المرسل (اختياري)
   final bool? isRead; // مؤشر القراءة (اختياري)
-  final List<String>? reactions; // تفاعلات إيموجي (اختياري)
   final String? forwardedFrom; // اسم المرسل الأصلي (اختياري)
   final DateTime? editedAt; // وقت التعديل (اختياري)
+  final Map<String, List<String>> reactions;
 
   ChatMessage({
     required this.id,
@@ -43,9 +43,9 @@ class ChatMessage {
     this.sender,
     this.avatarUrl,
     this.isRead,
-    this.reactions,
     this.forwardedFrom,
     this.editedAt,
+    this.reactions = const {}, // افتراضي فارغ
   });
 
   ChatMessage copyWith({
@@ -65,9 +65,9 @@ class ChatMessage {
     String? sender,
     String? avatarUrl,
     bool? isRead,
-    List<String>? reactions,
     String? forwardedFrom,
     DateTime? editedAt,
+    Map<String, List<String>>? reactions,
   }) {
     return ChatMessage(
       id: id ?? this.id,
@@ -86,9 +86,9 @@ class ChatMessage {
       sender: sender ?? this.sender,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       isRead: isRead ?? this.isRead,
-      reactions: reactions ?? this.reactions,
       forwardedFrom: forwardedFrom ?? this.forwardedFrom,
       editedAt: editedAt ?? this.editedAt,
+      reactions: reactions ?? this.reactions,
     );
   }
 }
@@ -449,6 +449,33 @@ class LocalChatDataSource extends ChangeNotifier {
     if (messages.length >= 100) _hasMore = false;
     _isLoading = false;
     notifyListeners();
+  }
+
+  // إضافة رد فعل
+  void addReaction(String messageId, String reaction, String userId) {
+    final index = messages.indexWhere((m) => m.id == messageId);
+    if (index == -1) return;
+    final msg = messages[index];
+    final reactions = Map<String, List<String>>.from(msg.reactions);
+    reactions.putIfAbsent(reaction, () => []);
+    if (!reactions[reaction]!.contains(userId)) {
+      reactions[reaction]!.add(userId);
+      messages[index] = msg.copyWith(reactions: reactions);
+    }
+  }
+
+  // إزالة رد فعل
+  void removeReaction(String messageId, String reaction, String userId) {
+    final index = messages.indexWhere((m) => m.id == messageId);
+    if (index == -1) return;
+    final msg = messages[index];
+    if (!msg.reactions.containsKey(reaction)) return;
+    final reactions = Map<String, List<String>>.from(msg.reactions);
+    reactions[reaction]!.remove(userId);
+    if (reactions[reaction]!.isEmpty) {
+      reactions.remove(reaction);
+    }
+    messages[index] = msg.copyWith(reactions: reactions);
   }
 
   void reset() {

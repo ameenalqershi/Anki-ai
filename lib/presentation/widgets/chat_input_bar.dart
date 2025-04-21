@@ -1,3 +1,4 @@
+import 'package:english_mentor_ai2/providers/chat_provider.dart';
 import 'package:flutter/material.dart';
 import '../../data/local_data_source.dart';
 
@@ -9,14 +10,17 @@ class ChatInputBar extends StatefulWidget {
     String? fileName,
     int? fileSize,
     String? replyToId,
+    ChatProvider provider,
   )
   onSend;
 
+  final ChatProvider provider;
   final ChatMessage? replyTo;
   final VoidCallback? onCancelReply;
 
   const ChatInputBar({
     super.key,
+    required this.provider,
     required this.onSend,
     this.replyTo,
     this.onCancelReply,
@@ -43,6 +47,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
       _inputFileName,
       _inputFileSize,
       widget.replyTo?.id,
+      widget.provider,
     );
     setState(() {
       _controller.clear();
@@ -56,10 +61,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
 
   @override
   Widget build(BuildContext context) {
-    final canSend =
-        _inputType == MessageType.text
-            ? _controller.text.trim().isNotEmpty
-            : true;
+    final canSend = true;
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),

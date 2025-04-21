@@ -1,7 +1,5 @@
 import 'package:english_mentor_ai2/data/local_data_source.dart';
 import 'package:flutter/material.dart';
-
-// استورد العارض الخاص بك (طورته لك سابقًا)
 import 'telegram_image_viewer.dart';
 
 class ChatMessageBubble extends StatelessWidget {
@@ -10,19 +8,22 @@ class ChatMessageBubble extends StatelessWidget {
   final VoidCallback? onLongPress;
   final Function(ChatMessage)? onReply;
 
+  // أضف هذا المتغير لتمرير ReactionBar كودجت مباشرة من الشاشة
+  final Widget? reactionBar;
+
   const ChatMessageBubble({
     super.key,
     required this.msg,
     this.repliedMsg,
     this.onLongPress,
     this.onReply,
+    this.reactionBar, // متغير الريأكشن بار
   });
 
   @override
   Widget build(BuildContext context) {
     final isMe = msg.isMe;
 
-    /// Telegram-like bubble alignment and margin
     EdgeInsets bubbleMargin = EdgeInsets.only(
       top: 4,
       bottom: 4,
@@ -32,7 +33,25 @@ class ChatMessageBubble extends StatelessWidget {
 
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Padding(padding: bubbleMargin, child: _buildByType(context)),
+      child: Padding(
+        padding: bubbleMargin,
+        child: Column(
+          crossAxisAlignment:
+              isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            GestureDetector(
+              onLongPress: onLongPress,
+              child: _buildByType(context),
+            ),
+            if (reactionBar != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 3),
+                child: reactionBar!,
+              ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -165,7 +184,6 @@ class ChatMessageBubble extends StatelessWidget {
 
   /// =========== VOICE BUBBLE ===========
   Widget _buildVoiceBubble(BuildContext context) {
-    // احتفظ بعرض التسجيل الصوتي كما هو
     return Container(
       decoration: BoxDecoration(
         color: msg.isMe ? const Color(0xffe0f6fd) : Colors.white,
@@ -197,7 +215,6 @@ class ChatMessageBubble extends StatelessWidget {
 
   /// =========== VIDEO BUBBLE ===========
   Widget _buildVideoBubble(BuildContext context) {
-    // احتفظ بعرض الفيديو كما هو
     return Container(
       decoration: BoxDecoration(
         color: msg.isMe ? const Color(0xffe0f6fd) : Colors.white,
@@ -224,7 +241,6 @@ class ChatMessageBubble extends StatelessWidget {
 
   /// =========== FILE BUBBLE ===========
   Widget _buildFileBubble(BuildContext context) {
-    // احتفظ بعرض الملف كما هو
     return Container(
       decoration: BoxDecoration(
         color: msg.isMe ? const Color(0xffe0f6fd) : Colors.white,
@@ -316,7 +332,6 @@ class ChatMessageBubble extends StatelessWidget {
   }
 
   String _formatSentAt(DateTime dateTime) {
-    // يمكنك تحسين التنسيق حسب لغتك/دولتك
     return "${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')} at "
         "${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}";
   }

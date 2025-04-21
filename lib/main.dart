@@ -1,6 +1,8 @@
 import 'package:english_mentor_ai2/injector.dart';
+import 'package:english_mentor_ai2/providers/chat_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import 'presentation/pages/chat_list_screen.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
@@ -11,7 +13,12 @@ Future<void> main() async {
     null,
   ); // استخدم اللغة التي تعرض بها التواريخ
   setupDependencies();
-  runApp(const MyApp());
+  runApp(
+    MultiProvider(
+      providers: [ChangeNotifierProvider(create: (_) => ChatProvider())],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {

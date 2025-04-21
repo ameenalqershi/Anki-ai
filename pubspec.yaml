@@ -12,7 +12,7 @@ dependencies:
 
   # المكاتب المحدثة لتتوافق مع NDK 27
   cached_network_image: ^3.4.1
-  swipe_to: ^1.0.2
+  swipe_to: ^1.0.6
   flutter_svg: ^2.1.0
   image_picker: ^1.1.2    # إصدار يعمل مع NDK 27
   file_picker: ^10.1.2    # ترقية للإصدار 10.1.2.x
@@ -55,6 +55,7 @@ dependencies:
   flutter_local_notifications: ^17.1.0
 
   google_fonts: ^6.2.1
+  provider: ^6.1.4
 
 
 dev_dependencies:
