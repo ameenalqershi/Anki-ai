@@ -24,7 +24,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    // تحميل أول دفعة عند الدخول
     Future.microtask(
       () => ref.read(chatProvider.notifier).loadInitialMessages(),
     );
@@ -66,7 +65,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     String? fileName,
     int? fileSize,
     String? replyToId,
-    // لن يتم استخدامه مع Riverpod لكن متوافق مع ChatInputBar الحالي
   ) {
     final newMsg = ChatMessage(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -86,7 +84,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     Future.delayed(const Duration(milliseconds: 120), _scrollToBottom);
   }
 
-  /// تحليل وتجميع رسائل الصور المتتالية كـBubble واحدة
   List<_BubbleData> buildChatBubbles(List<ChatMessage> messages) {
     final List<_BubbleData> bubbles = [];
     int i = 0;
@@ -94,7 +91,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     while (i < messages.length) {
       final msg = messages[i];
 
-      // إذا كانت رسالة صورة، ابحث عن صور متتالية من نفس المرسل بفارق زمني صغير (60 ثانية)
       if (msg.type == MessageType.image) {
         List<String> albumUrls = [msg.mediaUrl ?? ""];
         int j = i + 1;
@@ -106,7 +102,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           albumUrls.add(messages[j].mediaUrl ?? "");
           j++;
         }
-        // إذا أكثر من صورة، استخدم TelegramAlbumBubble
         if (albumUrls.length > 1) {
           bubbles.add(
             _BubbleData(
@@ -144,7 +139,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         }
       }
 
-      // الرسائل العادية
       final repliedMsg =
           msg.replyToMessageId != null
               ? messages.firstWhere(
@@ -171,13 +165,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             reactionBar: ReactionBar(
               message: msg,
               onAddReaction: (reaction) {
-                final userId = "me"; // استبدلها بمعرف المستخدم الحقيقي لديك
+                final userId = "me";
                 ref
                     .read(chatProvider.notifier)
                     .addReaction(msg.id, reaction, userId);
               },
               onRemoveReaction: (reaction) {
-                final userId = "me"; // استبدلها بمعرف المستخدم الحقيقي لديك
+                final userId = "me";
                 ref
                     .read(chatProvider.notifier)
                     .removeReaction(msg.id, reaction, userId);
@@ -206,10 +200,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         elevation: 1.5,
         title: Row(
           children: [
-            const CircleAvatar(
+            CircleAvatar(
               backgroundImage: NetworkImage(
                 "https://i.ibb.co/9tBv1z9/telegram-avatar.png",
               ),
+              onBackgroundImageError: (exception, stackTrace) {},
               radius: 18,
             ),
             const SizedBox(width: 12),
@@ -226,6 +221,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           SafeArea(
             child: Column(
               children: [
+                // هنا البروجرس بار أعلى الرسائل عند التحميل
+                if (chatState.isLoading)
+                  SizedBox(
+                    height: 32,
+                    child: Center(
+                      child: SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2.5),
+                      ),
+                    ),
+                  ),
                 Expanded(
                   child: ListView.builder(
                     key: const PageStorageKey('chat_list'),

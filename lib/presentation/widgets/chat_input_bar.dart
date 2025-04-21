@@ -57,8 +57,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
 
   @override
   Widget build(BuildContext context) {
-    final canSend =
-        _inputType != MessageType.text || _controller.text.trim().isNotEmpty;
+    final canSend = true;
     return RepaintBoundary(
       key: const ValueKey('chat_input_bar'),
       child: Container(
