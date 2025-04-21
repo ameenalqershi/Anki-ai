@@ -1,163 +1,245 @@
 import 'package:flutter/material.dart';
-import 'package:english_mentor_ai2/data/local_data_source.dart';
+import '../../data/local_data_source.dart';
 import 'audio_player_widget.dart';
-import 'media_viewer.dart';
+import 'gallery_grid.dart';
 
 class ChatMessageBubble extends StatelessWidget {
   final ChatMessage msg;
-  final ChatMessage? replyTo;
-  const ChatMessageBubble({super.key, required this.msg, this.replyTo});
+  final ChatMessage? repliedMsg;
+  final VoidCallback? onLongPress;
+  final Function(ChatMessage)? onReply;
+
+  const ChatMessageBubble({
+    super.key,
+    required this.msg,
+    this.repliedMsg,
+    this.onLongPress,
+    this.onReply,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final isMe = msg.isMe;
-    final color = isMe ? const Color(0xff63aee1) : Colors.white;
-    final textColor = isMe ? Colors.white : Colors.black87;
-    Widget content;
+    final bool isMe = msg.isMe; // عرّفه هنا فقط
+    // تلجرام: حواف الفقاعة وتدرج اللون
+    final Gradient gradient =
+        isMe
+            ? const LinearGradient(
+              colors: [Color(0xff6ec6ff), Color(0xff2196f3)],
+              begin: Alignment.topRight,
+              end: Alignment.bottomLeft,
+            )
+            : const LinearGradient(
+              colors: [Colors.white, Color(0xfff1f1f1)],
+              begin: Alignment.topRight,
+              end: Alignment.bottomLeft,
+            );
 
-    if (msg.type == MessageType.text || msg.type == MessageType.code) {
+    final textColor = isMe ? Colors.white : Colors.black87;
+
+    BorderRadius borderRadius = BorderRadius.only(
+      topLeft: isMe ? const Radius.circular(18) : const Radius.circular(4),
+      topRight: isMe ? const Radius.circular(4) : const Radius.circular(18),
+      bottomLeft: const Radius.circular(18),
+      bottomRight: const Radius.circular(18),
+    );
+
+    // --- محتوى الفقاعة حسب النوع ---
+    Widget content;
+    if (msg.type == MessageType.text) {
       content = Text(
         msg.text,
-        style: TextStyle(
-          fontSize: msg.type == MessageType.code ? 15 : 16,
-          color: textColor,
-          fontFamily: msg.type == MessageType.code ? 'monospace' : null,
-          backgroundColor:
-              msg.type == MessageType.code
-                  ? (isMe ? Colors.blue[700] : Colors.grey[200])
-                  : null,
-          height: 1.5,
+        style: TextStyle(fontSize: 16, color: textColor),
+      );
+    } else if (msg.type == MessageType.image &&
+        msg.mediaUrl != null &&
+        msg.mediaUrl!.contains(',')) {
+      // مجموعة صور (ألبوم)
+      final images = msg.mediaUrl!.split(',');
+      content = GalleryGrid(images: images);
+    } else if (msg.type == MessageType.image && msg.mediaUrl != null) {
+      content = ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Image.network(
+          msg.mediaUrl!,
+          width: 210,
+          height: 210,
+          fit: BoxFit.cover,
         ),
       );
-    } else if (msg.type == MessageType.voice) {
+    } else if (msg.type == MessageType.voice && msg.mediaUrl != null) {
       content = AudioPlayerWidget(url: msg.mediaUrl!);
-    } else if (msg.type == MessageType.video) {
-      content = GestureDetector(
-        onTap:
-            () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder:
-                    (_) => MediaViewer(
-                      items: [
-                        MediaItem(url: msg.mediaUrl!, type: MediaType.video),
-                      ],
-                      initialIndex: 0,
-                    ),
-              ),
-            ),
-        child: Container(
-          width: 180,
-          height: 120,
-          color: Colors.black12,
-          child: const Center(
-            child: Icon(
-              Icons.play_circle_fill,
-              size: 48,
-              color: Colors.deepPurple,
-            ),
-          ),
-        ),
-      );
     } else if (msg.type == MessageType.file) {
       content = Row(
         children: [
-          const Icon(Icons.description, color: Colors.orange, size: 24),
+          const Icon(Icons.insert_drive_file, color: Colors.blue),
           const SizedBox(width: 7),
           Expanded(
             child: Text(
               msg.fileName ?? "ملف",
-              style: TextStyle(fontSize: 15, color: textColor),
+              style: TextStyle(color: textColor),
             ),
           ),
-          const SizedBox(width: 6),
-          Text(
-            msg.fileSize != null
-                ? "${(msg.fileSize! / 1024).toStringAsFixed(1)} KB"
-                : "",
-            style: TextStyle(color: textColor, fontSize: 13),
-          ),
+          if (msg.fileSize != null)
+            Text(
+              " ${(msg.fileSize! / 1024).toStringAsFixed(1)} KB",
+              style: TextStyle(color: textColor, fontSize: 12),
+            ),
         ],
       );
-    } else {
-      content = const SizedBox.shrink();
-    }
-
-    Widget? replyWidget;
-    if (replyTo != null) {
-      replyWidget = Container(
-        margin: const EdgeInsets.only(bottom: 6),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: isMe ? Colors.white24 : Colors.blue.shade50,
-          borderRadius: BorderRadius.circular(10),
-          border: Border(
-            left: BorderSide(
-              color: isMe ? Colors.white : Colors.blue,
-              width: 4,
-            ),
+    } else if (msg.type == MessageType.code) {
+      content = Container(
+        color: Colors.black.withOpacity(0.07),
+        padding: const EdgeInsets.all(7),
+        margin: const EdgeInsets.only(top: 3),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Text(
+            msg.text,
+            style: const TextStyle(fontFamily: 'monospace', fontSize: 13.5),
           ),
         ),
-        child: Row(
-          children: [
-            const Icon(Icons.reply, size: 16, color: Colors.blueGrey),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                replyTo!.text.isNotEmpty
-                    ? replyTo!.text
-                    : replyTo!.type == MessageType.image
-                    ? "📷 صورة"
-                    : replyTo!.type == MessageType.voice
-                    ? "🔊 رسالة صوتية"
-                    : replyTo!.type == MessageType.file
-                    ? "📎 ملف"
-                    : replyTo!.type == MessageType.code
-                    ? "كود برمجي"
-                    : "رد",
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: isMe ? Colors.white70 : Colors.blueGrey,
-                  fontStyle: FontStyle.italic,
-                ),
+      );
+    } else {
+      content = Text(
+        msg.text,
+        style: TextStyle(fontSize: 16, color: textColor),
+      );
+    }
+
+    // --- عرض الرد (reply) تلجرام ستايل ---
+    Widget? replyWidget;
+    if (repliedMsg != null && repliedMsg!.id.isNotEmpty) {
+      replyWidget = GestureDetector(
+        onTap: () => onReply?.call(repliedMsg!),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 7),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: isMe ? Colors.blue[100] : Colors.grey[200],
+            border: Border(
+              right: BorderSide(
+                color: isMe ? Colors.blue : Colors.green,
+                width: 4,
               ),
             ),
-          ],
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  repliedMsg!.text.isNotEmpty
+                      ? repliedMsg!.text.length > 40
+                          ? repliedMsg!.text.substring(0, 37) + "..."
+                          : repliedMsg!.text
+                      : "<${_typeLabel(repliedMsg!.type)}>",
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 13, color: Colors.black87),
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
 
+    // --- التفاعلات (ردود أفعال) على الرسالة ---
+    Widget reactions =
+        msg.reactions != null && msg.reactions!.isNotEmpty
+            ? Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Wrap(
+                spacing: 4,
+                children:
+                    msg.reactions!
+                        .map(
+                          (e) => Text(e, style: const TextStyle(fontSize: 18)),
+                        )
+                        .toList(),
+              ),
+            )
+            : const SizedBox.shrink();
+
+    // --- الهيكل النهائي للفقاعة ---
     return Row(
       mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         Flexible(
-          child: Container(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
             margin: EdgeInsets.only(
-              top: 8,
-              left: isMe ? 60 : 8,
-              right: isMe ? 8 : 60,
+              top: 10,
+              left: isMe ? 54 : 10,
+              right: isMe ? 10 : 54,
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(16),
+              gradient: gradient,
+              borderRadius: borderRadius,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 2,
-                  offset: const Offset(1, 1),
+                  color: Colors.black.withOpacity(0.07),
+                  blurRadius: 13,
+                  offset: const Offset(1, 5),
                 ),
               ],
             ),
-            child: Column(
-              crossAxisAlignment:
-                  isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-              children: [if (replyWidget != null) replyWidget, content],
+            child: InkWell(
+              borderRadius: borderRadius,
+              onLongPress: onLongPress,
+              child: Padding(
+                padding: const EdgeInsets.all(13),
+                child: Column(
+                  crossAxisAlignment:
+                      isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                  children: [
+                    if (replyWidget != null) replyWidget,
+                    content,
+                    const SizedBox(height: 5),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          "${msg.createdAt.hour.toString().padLeft(2, '0')}:${msg.createdAt.minute.toString().padLeft(2, '0')}",
+                          style: TextStyle(
+                            color: textColor.withOpacity(0.7),
+                            fontSize: 11.5,
+                          ),
+                        ),
+                        if (isMe) ...[
+                          const SizedBox(width: 4),
+                          Icon(Icons.done_all, size: 15, color: Colors.white70),
+                        ],
+                      ],
+                    ),
+                    reactions,
+                  ],
+                ),
+              ),
             ),
           ),
         ),
       ],
     );
+  }
+
+  String _typeLabel(MessageType type) {
+    switch (type) {
+      case MessageType.voice:
+        return "صوت";
+      case MessageType.image:
+        return "صورة";
+      case MessageType.video:
+        return "فيديو";
+      case MessageType.file:
+        return "ملف";
+      case MessageType.code:
+        return "كود";
+      case MessageType.system:
+        return "نظام";
+      default:
+        return "";
+    }
   }
 }

@@ -942,186 +942,69 @@
 //   }
 // }
 import 'package:flutter/material.dart';
-import 'package:english_mentor_ai2/data/local_data_source.dart';
-import 'package:english_mentor_ai2/presentation/widgets/chat_message_bubble.dart';
-import 'package:english_mentor_ai2/presentation/widgets/chat_grouped_images.dart';
-import 'package:english_mentor_ai2/presentation/widgets/audio_player_widget.dart';
-import 'package:english_mentor_ai2/presentation/widgets/chat_status_bar.dart';
-import 'package:file_picker/file_picker.dart';
+import '../../data/local_data_source.dart';
+import '../widgets/chat_message_bubble.dart';
+import '../widgets/chat_input_bar.dart';
 
-class TelegramChatScreen extends StatefulWidget {
-  const TelegramChatScreen({Key? key}) : super(key: key);
+class ChatScreen extends StatefulWidget {
+  const ChatScreen({super.key});
 
   @override
-  State<TelegramChatScreen> createState() => _TelegramChatScreenState();
+  State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _TelegramChatScreenState extends State<TelegramChatScreen> {
+class _ChatScreenState extends State<ChatScreen> {
   final LocalChatDataSource dataSource = LocalChatDataSource.demo();
   final ScrollController _scrollController = ScrollController();
-  final TextEditingController _controller = TextEditingController();
-  bool _firstLoad = true;
-  bool _loadingMore = false;
-  bool _isRecording = false;
-  int _replyToIndex = -1;
+  ChatMessage? _replyTo;
+  bool _showJumpToBottom = false;
 
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(milliseconds: 500), () {
-      setState(() => _firstLoad = false);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_scrollController.hasClients) {
-          _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
-        }
-      });
-    });
-    _scrollController.addListener(_onScroll);
-  }
-
-  void _onScroll() async {
-    if (_scrollController.position.pixels <= 120 && !_loadingMore) {
-      setState(() => _loadingMore = true);
-      await Future.delayed(
-        const Duration(milliseconds: 600),
-      ); // simulate loading
-      setState(() => _loadingMore = false);
-    }
-    // إظهار زر الرجوع للأسفل إذا لم يكن في الأسفل
-    setState(() {});
-  }
-
-  void _sendText() {
-    if (_controller.text.trim().isEmpty) return;
-    dataSource.addMessage(
-      ChatMessage(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        text: _controller.text,
-        isMe: true,
-        createdAt: DateTime.now(),
-        type: MessageType.text,
-        replyTo:
-            _replyToIndex != -1 ? dataSource.messages[_replyToIndex].id : null,
-      ),
-    );
-    _controller.clear();
-    _replyToIndex = -1;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
+    _scrollController.addListener(() {
+      final threshold = 260.0;
+      if (_scrollController.offset > threshold && !_showJumpToBottom) {
+        setState(() => _showJumpToBottom = true);
+      } else if (_scrollController.offset <= threshold && _showJumpToBottom) {
+        setState(() => _showJumpToBottom = false);
       }
     });
-    setState(() {});
-  }
-
-  void _sendImage(String url) {
-    dataSource.addMessage(
-      ChatMessage(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        text: "",
-        mediaUrl: url,
-        isMe: true,
-        createdAt: DateTime.now(),
-        type: MessageType.image,
-      ),
-    );
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
-    setState(() {});
-  }
-
-  void _sendVoice(String url) {
-    dataSource.addMessage(
-      ChatMessage(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        text: "",
-        mediaUrl: url,
-        isMe: true,
-        createdAt: DateTime.now(),
-        type: MessageType.voice,
-      ),
-    );
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
-    setState(() {});
-  }
-
-  void _sendFile(String fileName, int fileSize) {
-    dataSource.addMessage(
-      ChatMessage(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        text: "",
-        fileName: fileName,
-        fileSize: fileSize,
-        isMe: true,
-        createdAt: DateTime.now(),
-        type: MessageType.file,
-      ),
-    );
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
-    setState(() {});
-  }
-
-  void _sendCode(String code) {
-    dataSource.addMessage(
-      ChatMessage(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        text: code,
-        isMe: true,
-        createdAt: DateTime.now(),
-        type: MessageType.code,
-      ),
-    );
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
-    setState(() {});
   }
 
   void _scrollToBottom() {
     _scrollController.animateTo(
-      _scrollController.position.maxScrollExtent,
-      duration: const Duration(milliseconds: 400),
+      0,
+      duration: const Duration(milliseconds: 350),
       curve: Curves.easeOut,
     );
   }
 
-  bool get _showScrollDown =>
-      _scrollController.hasClients &&
-      _scrollController.offset <
-          _scrollController.position.maxScrollExtent - 300;
+  void _onSend(
+    String text,
+    MessageType type,
+    String? mediaUrl,
+    String? fileName,
+    int? fileSize,
+    String? replyToId,
+  ) {
+    final newMsg = ChatMessage(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      text: text,
+      isMe: true,
+      createdAt: DateTime.now(),
+      type: type,
+      mediaUrl: mediaUrl,
+      fileName: fileName,
+      fileSize: fileSize,
+      replyToMessageId: replyToId,
+    );
+    setState(() {
+      dataSource.addMessage(newMsg);
+      _replyTo = null;
+    });
+    Future.delayed(const Duration(milliseconds: 120), _scrollToBottom);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1147,217 +1030,66 @@ class _TelegramChatScreenState extends State<TelegramChatScreen> {
           IconButton(icon: const Icon(Icons.more_vert), onPressed: () {}),
         ],
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // شريط الحالة أعلى المحادثة
-            ChatStatusBar(dataSource: dataSource),
-            if (_loadingMore)
-              SizedBox(
-                height: 24,
-                child: Center(
-                  child: SizedBox(
-                    height: 18,
-                    width: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                ),
-              ),
-            Expanded(
-              child: Stack(
-                children: [
-                  ListView.builder(
+      body: Stack(
+        children: [
+          SafeArea(
+            child: Column(
+              children: [
+                Expanded(
+                  child: ListView.builder(
                     controller: _scrollController,
-                    reverse: false,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    reverse: true,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
                     itemCount: dataSource.messages.length,
                     itemBuilder: (ctx, idx) {
-                      final msg = dataSource.messages[idx];
-                      // إبراز رسائل النظام
-                      if (msg.type == MessageType.system) {
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8.0),
-                          child: Center(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 5,
-                                horizontal: 16,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.grey[300],
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                msg.text,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      }
-                      // صور مجمعة
-                      if (msg.type == MessageType.image) {
-                        // إذا كانت هذه أول صورة ضمن مجموعة صور متتالية
-                        final List<ChatMessage> group = [];
-                        group.add(msg);
-                        int j = idx + 1;
-                        while (j < dataSource.messages.length &&
-                            dataSource.messages[j].type == MessageType.image &&
-                            dataSource.messages[j].isMe == msg.isMe) {
-                          group.add(dataSource.messages[j]);
-                          j++;
-                        }
-                        if (group.length > 1) {
-                          // عرض مجموعة صور مجمعة مرة واحدة
-                          return ChatGroupedImagesBubble(
-                            images: group,
-                            isMe: msg.isMe,
-                          );
-                        }
-                      }
-                      final replyMsg =
-                          dataSource.messages
-                                  .where((m) => m.id == msg.replyTo)
-                                  .isNotEmpty
+                      final msg =
+                          dataSource.messages[dataSource.messages.length -
+                              1 -
+                              idx];
+                      final repliedMsg =
+                          msg.replyToMessageId != null
                               ? dataSource.messages.firstWhere(
-                                (m) => m.id == msg.replyTo,
+                                (m) => m.id == msg.replyToMessageId,
+                                orElse:
+                                    () => ChatMessage(
+                                      id: '',
+                                      text: '',
+                                      isMe: false,
+                                      createdAt: DateTime.now(),
+                                      type: MessageType.text,
+                                    ),
                               )
                               : null;
-
-                      // رسالة عادية أو صوتية أو كود أو ملف أو رد
-                      return GestureDetector(
-                        onLongPress: () {
-                          setState(() {
-                            _replyToIndex = idx;
-                          });
-                        },
-                        child: ChatMessageBubble(msg: msg, replyTo: replyMsg),
+                      return ChatMessageBubble(
+                        msg: msg,
+                        repliedMsg: repliedMsg,
+                        onLongPress: () => setState(() => _replyTo = msg),
+                        onReply:
+                            (replyMsg) => setState(() => _replyTo = replyMsg),
                       );
                     },
                   ),
-                  // زر نزول لأسفل
-                  if (_showScrollDown)
-                    Positioned(
-                      right: 12,
-                      bottom: 14,
-                      child: FloatingActionButton(
-                        mini: true,
-                        backgroundColor: Colors.blue,
-                        onPressed: _scrollToBottom,
-                        child: const Icon(
-                          Icons.arrow_downward,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                ],
+                ),
+                ChatInputBar(
+                  onSend: _onSend,
+                  replyTo: _replyTo,
+                  onCancelReply: () => setState(() => _replyTo = null),
+                ),
+              ],
+            ),
+          ),
+          if (_showJumpToBottom)
+            Positioned(
+              right: 18,
+              bottom: 88,
+              child: FloatingActionButton(
+                mini: true,
+                backgroundColor: Colors.blueAccent,
+                onPressed: _scrollToBottom,
+                child: const Icon(Icons.arrow_downward, color: Colors.white),
               ),
             ),
-            // شريط الرد إذا تم اختيار رسالة للرد عليها
-            if (_replyToIndex != -1)
-              Container(
-                color: Colors.grey[200],
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 6,
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.reply, size: 18, color: Colors.blue),
-                    const SizedBox(width: 5),
-                    Expanded(
-                      child: Text(
-                        dataSource.messages[_replyToIndex].text.isNotEmpty
-                            ? dataSource.messages[_replyToIndex].text
-                            : (dataSource.messages[_replyToIndex].type ==
-                                    MessageType.image
-                                ? "📷 صورة"
-                                : dataSource.messages[_replyToIndex].type ==
-                                    MessageType.voice
-                                ? "🔊 رسالة صوتية"
-                                : "رد"),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 13),
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () {
-                        setState(() => _replyToIndex = -1);
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            // شريط الإدخال مع أزرار أنواع الرسائل
-            SafeArea(
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.attach_file),
-                    onPressed: () async {
-                      FilePickerResult? result =
-                          await FilePicker.platform.pickFiles();
-                      if (result != null && result.files.isNotEmpty) {
-                        final file = result.files.first;
-                        _sendFile(file.name, file.size);
-                      }
-                    },
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.image),
-                    onPressed: () {
-                      // أضف رابط صورة تجريبي أو استخدم FilePicker للصور
-                      _sendImage(
-                        "https://images.unsplash.com/photo-1506744038136-46273834b3fb",
-                      );
-                    },
-                  ),
-                  IconButton(
-                    icon:
-                        _isRecording
-                            ? const Icon(Icons.stop)
-                            : const Icon(Icons.mic),
-                    onPressed: () {
-                      // محاكاة إرسال صوتية (يفترض هنا رابط تجريبي أو مسار ملف)
-                      _sendVoice(
-                        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
-                      );
-                    },
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.code),
-                    onPressed: () {
-                      _sendCode("```dart\nprint('Hello, code!');\n```");
-                    },
-                  ),
-                  // حقل كتابة الرسالة
-                  Expanded(
-                    child: TextField(
-                      controller: _controller,
-                      decoration: const InputDecoration(
-                        hintText: "اكتب رسالة...",
-                        border: InputBorder.none,
-                      ),
-                      minLines: 1,
-                      maxLines: 4,
-                      onSubmitted: (_) => _sendText(),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.send),
-                    onPressed: _sendText,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }

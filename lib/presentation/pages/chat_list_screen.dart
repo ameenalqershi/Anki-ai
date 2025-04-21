@@ -103,7 +103,7 @@ class ChatListScreen extends StatelessWidget {
             context,
             MaterialPageRoute(
               // builder: (_) => ChatDetailScreen(chat: chat, chatId: '12'),
-              builder: (_) => TelegramChatScreen(),
+              builder: (_) => ChatScreen(),
             ),
           ),
     );

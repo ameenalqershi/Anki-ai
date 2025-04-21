@@ -17,12 +17,20 @@ class ChatMessage {
   final int? fileSize;
   final String? replyTo;
 
+  // خصائص جديدة لدعم الدردشة الحديثة:
+  final String? sender; // اسم المرسل (اختياري)
+  final String? avatarUrl; // صورة المرسل (اختياري)
+  final bool? isRead; // مؤشر القراءة (اختياري)
+  final List<String>? reactions; // تفاعلات إيموجي (اختياري)
+  final String? forwardedFrom; // اسم المرسل الأصلي (اختياري)
+  final DateTime? editedAt; // وقت التعديل (اختياري)
+
   ChatMessage({
     required this.id,
     required this.text,
     this.mediaUrl,
-    this.type = MessageType.text,
-    this.isMe = false,
+    required this.type,
+    required this.isMe,
     required this.createdAt,
     this.isDeleted = false,
     this.isEdited = false,
@@ -31,6 +39,13 @@ class ChatMessage {
     this.fileName,
     this.fileSize,
     this.replyTo,
+    // الجدد
+    this.sender,
+    this.avatarUrl,
+    this.isRead,
+    this.reactions,
+    this.forwardedFrom,
+    this.editedAt,
   });
 
   ChatMessage copyWith({
@@ -47,6 +62,12 @@ class ChatMessage {
     String? fileName,
     int? fileSize,
     String? replyTo,
+    String? sender,
+    String? avatarUrl,
+    bool? isRead,
+    List<String>? reactions,
+    String? forwardedFrom,
+    DateTime? editedAt,
   }) {
     return ChatMessage(
       id: id ?? this.id,
@@ -62,6 +83,12 @@ class ChatMessage {
       fileName: fileName ?? this.fileName,
       fileSize: fileSize ?? this.fileSize,
       replyTo: replyTo ?? this.replyTo,
+      sender: sender ?? this.sender,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+      isRead: isRead ?? this.isRead,
+      reactions: reactions ?? this.reactions,
+      forwardedFrom: forwardedFrom ?? this.forwardedFrom,
+      editedAt: editedAt ?? this.editedAt,
     );
   }
 }

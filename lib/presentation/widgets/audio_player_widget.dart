@@ -1,43 +1,46 @@
-import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 
 class AudioPlayerWidget extends StatefulWidget {
-  final String url;
-  const AudioPlayerWidget({required this.url, Key? key}) : super(key: key);
+  final String url; // رابط ملف الصوت (محلي أو نتورك)
+  const AudioPlayerWidget({super.key, required this.url});
 
   @override
   State<AudioPlayerWidget> createState() => _AudioPlayerWidgetState();
 }
 
 class _AudioPlayerWidgetState extends State<AudioPlayerWidget> {
-  final AudioPlayer _audioPlayer = AudioPlayer();
   bool isPlaying = false;
+  double progress = 0.0;
+  Duration duration = const Duration(seconds: 12);
 
-  @override
-  void dispose() {
-    _audioPlayer.dispose();
-    super.dispose();
-  }
-
-  void _toggle() async {
-    if (isPlaying) {
-      await _audioPlayer.pause();
-    } else {
-      await _audioPlayer.play(UrlSource(widget.url));
-    }
-    setState(() => isPlaying = !isPlaying);
-  }
-
+  // ملاحظة: هذا مجرد تمثيل شكلي، يمكن دمج حزمة صوت حقيقية مثل just_audio
   @override
   Widget build(BuildContext context) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         IconButton(
-          icon: Icon(isPlaying ? Icons.pause : Icons.play_arrow),
-          onPressed: _toggle,
+          icon: Icon(
+            isPlaying ? Icons.pause_circle : Icons.play_circle_fill,
+            color: Colors.blueAccent,
+            size: 32,
+          ),
+          onPressed: () => setState(() => isPlaying = !isPlaying),
         ),
-        // يمكنك إضافة شريط تقدم هنا
-        const Text("00:12"),
+        Expanded(
+          child: Slider(
+            value: progress,
+            onChanged: (v) => setState(() => progress = v),
+            min: 0,
+            max: duration.inSeconds.toDouble(),
+            activeColor: Colors.blueAccent,
+            inactiveColor: Colors.blue[100],
+          ),
+        ),
+        Text(
+          "${(duration.inSeconds - progress).clamp(0, duration.inSeconds).toInt()}s",
+          style: const TextStyle(fontSize: 12),
+        ),
       ],
     );
   }
