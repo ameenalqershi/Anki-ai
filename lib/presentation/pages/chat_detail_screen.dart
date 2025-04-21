@@ -945,6 +945,7 @@ import 'package:flutter/material.dart';
 import '../../data/local_data_source.dart';
 import '../widgets/chat_message_bubble.dart';
 import '../widgets/chat_input_bar.dart';
+import '../widgets/telegram_album_bubble.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -1006,8 +1007,95 @@ class _ChatScreenState extends State<ChatScreen> {
     Future.delayed(const Duration(milliseconds: 120), _scrollToBottom);
   }
 
+  /// تحليل وتجميع رسائل الصور المتتالية كـBubble واحدة
+  List<Widget> buildChatBubbles(List<ChatMessage> messages) {
+    final List<Widget> bubbles = [];
+    int i = 0;
+
+    while (i < messages.length) {
+      final msg = messages[i];
+
+      // إذا كانت رسالة صورة، ابحث عن صور متتالية من نفس المرسل بفارق زمني صغير (60 ثانية)
+      if (msg.type == MessageType.image) {
+        List<String> albumUrls = [msg.mediaUrl ?? ""];
+        int j = i + 1;
+        while (j < messages.length &&
+            messages[j].type == MessageType.image &&
+            messages[j].isMe == msg.isMe &&
+            messages[j].createdAt.difference(msg.createdAt).inSeconds.abs() <
+                60) {
+          albumUrls.add(messages[j].mediaUrl ?? "");
+          j++;
+        }
+        // إذا أكثر من صورة، استخدم TelegramAlbumBubble
+        if (albumUrls.length > 1) {
+          bubbles.add(
+            TelegramAlbumBubble(
+              imageUrls: albumUrls,
+              isMe: msg.isMe,
+              bottomWidget: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    "${msg.createdAt.hour.toString().padLeft(2, '0')}:${msg.createdAt.minute.toString().padLeft(2, '0')}",
+                    style: TextStyle(
+                      color: msg.isMe ? Colors.white : Colors.black54,
+                      fontSize: 12,
+                    ),
+                  ),
+                  if (msg.isMe)
+                    const Padding(
+                      padding: EdgeInsets.only(left: 4),
+                      child: Icon(
+                        Icons.done_all,
+                        size: 15,
+                        color: Colors.white70,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          );
+          i = j;
+          continue;
+        }
+      }
+
+      // الرسائل العادية
+      final repliedMsg =
+          msg.replyToMessageId != null
+              ? messages.firstWhere(
+                (m) => m.id == msg.replyToMessageId,
+                orElse:
+                    () => ChatMessage(
+                      id: '',
+                      text: '',
+                      isMe: false,
+                      createdAt: DateTime.now(),
+                      type: MessageType.text,
+                    ),
+              )
+              : null;
+
+      bubbles.add(
+        ChatMessageBubble(
+          msg: msg,
+          repliedMsg: repliedMsg,
+          onLongPress: () => setState(() => _replyTo = msg),
+          onReply: (replyMsg) => setState(() => _replyTo = replyMsg),
+        ),
+      );
+      i++;
+    }
+
+    return bubbles.reversed.toList();
+  }
+
   @override
   Widget build(BuildContext context) {
+    // استخدم الديمو من dataSource
+    final messages = dataSource.messages;
+
     return Scaffold(
       backgroundColor: const Color(0xffe5ebee),
       appBar: AppBar(
@@ -1036,38 +1124,11 @@ class _ChatScreenState extends State<ChatScreen> {
             child: Column(
               children: [
                 Expanded(
-                  child: ListView.builder(
+                  child: ListView(
                     controller: _scrollController,
                     reverse: true,
                     padding: const EdgeInsets.symmetric(vertical: 8),
-                    itemCount: dataSource.messages.length,
-                    itemBuilder: (ctx, idx) {
-                      final msg =
-                          dataSource.messages[dataSource.messages.length -
-                              1 -
-                              idx];
-                      final repliedMsg =
-                          msg.replyToMessageId != null
-                              ? dataSource.messages.firstWhere(
-                                (m) => m.id == msg.replyToMessageId,
-                                orElse:
-                                    () => ChatMessage(
-                                      id: '',
-                                      text: '',
-                                      isMe: false,
-                                      createdAt: DateTime.now(),
-                                      type: MessageType.text,
-                                    ),
-                              )
-                              : null;
-                      return ChatMessageBubble(
-                        msg: msg,
-                        repliedMsg: repliedMsg,
-                        onLongPress: () => setState(() => _replyTo = msg),
-                        onReply:
-                            (replyMsg) => setState(() => _replyTo = replyMsg),
-                      );
-                    },
+                    children: buildChatBubbles(messages),
                   ),
                 ),
                 ChatInputBar(
