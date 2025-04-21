@@ -260,6 +260,7 @@ class SqliteDataSource {
       where: whereStr.isNotEmpty ? whereStr : null,
       whereArgs: whereArgs.isNotEmpty ? whereArgs : null,
       orderBy: 'createdAt ASC',
+      limit: 1,
     );
     List<ChatMessage> msgs = [];
     for (final map in maps) {
@@ -267,6 +268,50 @@ class SqliteDataSource {
       final reactions = await getReactions(msg.id);
       msgs.add(msg.copyWith(reactions: reactions));
     }
+    return msgs;
+  }
+
+  // Paging: تحميل رسائل محدودة مع دعم beforeId
+  Future<List<ChatMessage>> getMessages({
+    required int limit,
+    String? beforeId,
+  }) async {
+    final db = await database;
+
+    String where = "";
+    List<dynamic> whereArgs = [];
+    int? beforeMillis;
+
+    if (beforeId != null) {
+      // جلب تاريخ الرسالة المرجعية
+      final result = await db.query(
+        'messages',
+        where: 'id = ?',
+        whereArgs: [beforeId],
+        limit: 1,
+      );
+      if (result.isNotEmpty) {
+        beforeMillis = result.first['createdAt'] as int;
+      }
+      where = 'createdAt < ?';
+      whereArgs = [beforeMillis];
+    }
+
+    final result = await db.query(
+      'messages',
+      where: where.isEmpty ? null : where,
+      whereArgs: whereArgs.isEmpty ? null : whereArgs,
+      orderBy: 'createdAt ASC',
+      limit: limit,
+    );
+
+    List<ChatMessage> msgs = [];
+    for (final map in result) {
+      final msg = _msgFromMap(map);
+      final reactions = await getReactions(msg.id);
+      msgs.add(msg.copyWith(reactions: reactions));
+    }
+
     return msgs;
   }
 

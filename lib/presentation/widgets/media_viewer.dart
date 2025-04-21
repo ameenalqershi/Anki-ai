@@ -23,10 +23,13 @@ class _MediaViewerState extends State<MediaViewer> {
   VideoPlayerController? _videoController;
   final mediaStore = MediaStore();
 
+  PageController? _pageController;
+
   @override
   void initState() {
     super.initState();
     _current = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
     if (_isVideo(widget.items[_current])) {
       _initVideo(widget.items[_current].url);
     }
@@ -35,6 +38,7 @@ class _MediaViewerState extends State<MediaViewer> {
   @override
   void dispose() {
     _videoController?.dispose();
+    _pageController?.dispose();
     super.dispose();
   }
 
@@ -126,8 +130,9 @@ class _MediaViewerState extends State<MediaViewer> {
         ],
       ),
       body: PageView.builder(
+        key: const PageStorageKey('media_viewer_pageview'),
         itemCount: widget.items.length,
-        controller: PageController(initialPage: widget.initialIndex),
+        controller: _pageController,
         onPageChanged: _onPageChanged,
         itemBuilder: (ctx, idx) {
           final media = widget.items[idx];
@@ -171,7 +176,7 @@ class _MediaViewerState extends State<MediaViewer> {
             // عارض صور بالسحب (PhotoView)
             return PhotoViewGallery(
               backgroundDecoration: const BoxDecoration(color: Colors.black),
-              pageController: PageController(initialPage: _current),
+              pageController: _pageController,
               onPageChanged: _onPageChanged,
               pageOptions:
                   widget.items
@@ -181,6 +186,10 @@ class _MediaViewerState extends State<MediaViewer> {
                           imageProvider: NetworkImage(img.url),
                           minScale: PhotoViewComputedScale.contained,
                           maxScale: PhotoViewComputedScale.covered * 2,
+                          // استخدام مفتاح فريد لتقليل إعادة البناء
+                          heroAttributes: PhotoViewHeroAttributes(
+                            tag: 'image_${img.url}',
+                          ),
                         ),
                       )
                       .toList(),

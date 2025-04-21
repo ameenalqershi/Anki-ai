@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'telegram_image_viewer.dart';
 
+/// فقاعة رسالة دردشة محسنة للأداء
 class ChatMessageBubble extends StatelessWidget {
   final ChatMessage msg;
   final ChatMessage? repliedMsg;
@@ -11,13 +12,13 @@ class ChatMessageBubble extends StatelessWidget {
   final Widget? reactionBar;
 
   const ChatMessageBubble({
-    super.key,
+    Key? key,
     required this.msg,
     this.repliedMsg,
     this.onLongPress,
     this.onReply,
     this.reactionBar,
-  });
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -30,11 +31,13 @@ class ChatMessageBubble extends StatelessWidget {
       right: isMe ? 8 : 40,
     );
 
-    return Align(
-      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Padding(
-        padding: bubbleMargin,
-        child: RepaintBoundary(
+    // تغليف الفقاعة بـRepaintBoundary ومفتاح فريد لتعزيز الأداء
+    return RepaintBoundary(
+      key: ValueKey('msg_${msg.id}'),
+      child: Align(
+        alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+        child: Padding(
+          padding: bubbleMargin,
           child: Column(
             crossAxisAlignment:
                 isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
@@ -44,12 +47,6 @@ class ChatMessageBubble extends StatelessWidget {
                 onLongPress: onLongPress,
                 child: _buildByType(context),
               ),
-              if (reactionBar != null)
-                const Padding(
-                  padding: EdgeInsets.only(top: 3),
-                  child:
-                      null, // سيتم استبدال null بـ reactionBar! في السطر التالي
-                ),
               if (reactionBar != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 3),
@@ -177,6 +174,7 @@ class ChatMessageBubble extends StatelessWidget {
                       width: 240,
                       child: const Icon(Icons.broken_image, size: 48),
                     ),
+                // دعم precacheImage عبر CachedNetworkImage متوافر تلقائياً
               ),
             ),
           ),

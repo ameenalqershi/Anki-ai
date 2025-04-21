@@ -10,17 +10,14 @@ class ChatInputBar extends StatefulWidget {
     String? fileName,
     int? fileSize,
     String? replyToId,
-    ChatProvider provider,
   )
   onSend;
 
-  final ChatProvider provider;
   final ChatMessage? replyTo;
   final VoidCallback? onCancelReply;
 
   const ChatInputBar({
     super.key,
-    required this.provider,
     required this.onSend,
     this.replyTo,
     this.onCancelReply,
@@ -47,7 +44,6 @@ class _ChatInputBarState extends State<ChatInputBar> {
       _inputFileName,
       _inputFileSize,
       widget.replyTo?.id,
-      widget.provider,
     );
     setState(() {
       _controller.clear();
@@ -61,149 +57,157 @@ class _ChatInputBarState extends State<ChatInputBar> {
 
   @override
   Widget build(BuildContext context) {
-    final canSend = true;
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (widget.replyTo != null)
-            Container(
-              margin: const EdgeInsets.only(bottom: 6),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-              decoration: BoxDecoration(
-                color: Colors.lightBlueAccent.withOpacity(0.09),
-                border: Border(
-                  right: BorderSide(
-                    color: Colors.lightBlueAccent.shade700,
-                    width: 4,
-                  ),
-                ),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      widget.replyTo!.text.isNotEmpty
-                          ? (widget.replyTo!.text.length > 70
-                              ? widget.replyTo!.text.substring(0, 66) + "..."
-                              : widget.replyTo!.text)
-                          : "<${_getTypeLabel(widget.replyTo!.type)}>",
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Colors.black87,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+    final canSend =
+        _inputType != MessageType.text || _controller.text.trim().isNotEmpty;
+    return RepaintBoundary(
+      key: const ValueKey('chat_input_bar'),
+      child: Container(
+        color: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (widget.replyTo != null)
+              Container(
+                margin: const EdgeInsets.only(bottom: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                decoration: BoxDecoration(
+                  color: Colors.lightBlueAccent.withOpacity(0.09),
+                  border: Border(
+                    right: BorderSide(
+                      color: Colors.lightBlueAccent.shade700,
+                      width: 4,
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.close, size: 20, color: Colors.red),
-                    onPressed: widget.onCancelReply,
-                  ),
-                ],
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        widget.replyTo!.text.isNotEmpty
+                            ? (widget.replyTo!.text.length > 70
+                                ? widget.replyTo!.text.substring(0, 66) + "..."
+                                : widget.replyTo!.text)
+                            : "<${_getTypeLabel(widget.replyTo!.type)}>",
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Colors.black87,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.close,
+                        size: 20,
+                        color: Colors.red,
+                      ),
+                      onPressed: widget.onCancelReply,
+                    ),
+                  ],
+                ),
               ),
+            Row(
+              children: [
+                IconButton(
+                  icon: const Icon(
+                    Icons.emoji_emotions_outlined,
+                    color: Colors.grey,
+                  ),
+                  onPressed: () {},
+                ),
+                Expanded(
+                  child:
+                      _inputType == MessageType.text
+                          ? TextField(
+                            controller: _controller,
+                            minLines: 1,
+                            maxLines: 4,
+                            textDirection: TextDirection.rtl,
+                            decoration: const InputDecoration(
+                              hintText: "اكتب رسالة...",
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.symmetric(vertical: 8),
+                            ),
+                            onSubmitted: (_) => _send(),
+                          )
+                          : _mediaPreview(),
+                ),
+                GestureDetector(
+                  onTap: canSend ? _send : null,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeIn,
+                    child: CircleAvatar(
+                      backgroundColor:
+                          canSend
+                              ? const Color(0xff63aee1)
+                              : Colors.grey.shade300,
+                      radius: 22,
+                      child: Icon(
+                        Icons.send,
+                        color: canSend ? Colors.white : Colors.grey,
+                        size: 22,
+                      ),
+                    ),
+                  ),
+                ),
+                PopupMenuButton(
+                  icon: const Icon(Icons.attach_file, color: Colors.blueAccent),
+                  itemBuilder:
+                      (context) => [
+                        PopupMenuItem(
+                          value: 'image',
+                          child: const Text('إرسال صورة'),
+                        ),
+                        PopupMenuItem(
+                          value: 'video',
+                          child: const Text('إرسال فيديو'),
+                        ),
+                        PopupMenuItem(
+                          value: 'voice',
+                          child: const Text('إرسال صوت'),
+                        ),
+                        PopupMenuItem(
+                          value: 'file',
+                          child: const Text('إرسال ملف'),
+                        ),
+                      ],
+                  onSelected: (v) async {
+                    if (v == 'image') {
+                      setState(() {
+                        _inputType = MessageType.image;
+                        _inputMediaUrl =
+                            "https://placehold.co/300x200?text=صورة+جديدة";
+                      });
+                    } else if (v == 'video') {
+                      setState(() {
+                        _inputType = MessageType.video;
+                        _inputMediaUrl =
+                            "https://sample-videos.com/video123/mp4/240/big_buck_bunny_240p_1mb.mp4";
+                      });
+                    } else if (v == 'voice') {
+                      setState(() {
+                        _inputType = MessageType.voice;
+                        _inputMediaUrl = "voice_sample.mp3";
+                      });
+                    } else if (v == 'file') {
+                      setState(() {
+                        _inputType = MessageType.file;
+                        _inputMediaUrl =
+                            "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf";
+                        _inputFileName = "ملف.pdf";
+                        _inputFileSize = 1024 * 1024;
+                      });
+                    }
+                  },
+                ),
+              ],
             ),
-          Row(
-            children: [
-              IconButton(
-                icon: const Icon(
-                  Icons.emoji_emotions_outlined,
-                  color: Colors.grey,
-                ),
-                onPressed: () {},
-              ),
-              Expanded(
-                child:
-                    _inputType == MessageType.text
-                        ? TextField(
-                          controller: _controller,
-                          minLines: 1,
-                          maxLines: 4,
-                          textDirection: TextDirection.rtl,
-                          decoration: const InputDecoration(
-                            hintText: "اكتب رسالة...",
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(vertical: 8),
-                          ),
-                          onSubmitted: (_) => _send(),
-                        )
-                        : _mediaPreview(),
-              ),
-              GestureDetector(
-                onTap: canSend ? _send : null,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  curve: Curves.easeIn,
-                  child: CircleAvatar(
-                    backgroundColor:
-                        canSend
-                            ? const Color(0xff63aee1)
-                            : Colors.grey.shade300,
-                    radius: 22,
-                    child: Icon(
-                      Icons.send,
-                      color: canSend ? Colors.white : Colors.grey,
-                      size: 22,
-                    ),
-                  ),
-                ),
-              ),
-              PopupMenuButton(
-                icon: const Icon(Icons.attach_file, color: Colors.blueAccent),
-                itemBuilder:
-                    (context) => [
-                      PopupMenuItem(
-                        value: 'image',
-                        child: const Text('إرسال صورة'),
-                      ),
-                      PopupMenuItem(
-                        value: 'video',
-                        child: const Text('إرسال فيديو'),
-                      ),
-                      PopupMenuItem(
-                        value: 'voice',
-                        child: const Text('إرسال صوت'),
-                      ),
-                      PopupMenuItem(
-                        value: 'file',
-                        child: const Text('إرسال ملف'),
-                      ),
-                    ],
-                onSelected: (v) async {
-                  if (v == 'image') {
-                    setState(() {
-                      _inputType = MessageType.image;
-                      _inputMediaUrl =
-                          "https://placehold.co/300x200?text=صورة+جديدة";
-                    });
-                  } else if (v == 'video') {
-                    setState(() {
-                      _inputType = MessageType.video;
-                      _inputMediaUrl =
-                          "https://sample-videos.com/video123/mp4/240/big_buck_bunny_240p_1mb.mp4";
-                    });
-                  } else if (v == 'voice') {
-                    setState(() {
-                      _inputType = MessageType.voice;
-                      _inputMediaUrl = "voice_sample.mp3";
-                    });
-                  } else if (v == 'file') {
-                    setState(() {
-                      _inputType = MessageType.file;
-                      _inputMediaUrl =
-                          "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf";
-                      _inputFileName = "ملف.pdf";
-                      _inputFileSize = 1024 * 1024;
-                    });
-                  }
-                },
-              ),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

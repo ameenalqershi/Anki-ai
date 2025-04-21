@@ -20,6 +20,7 @@ class ReactionBar extends StatelessWidget {
     final myUserId = "me"; // استبدلها بمعرف المستخدم الحقيقي لديك
 
     return RepaintBoundary(
+      key: ValueKey('reactions_${message.id}'),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [

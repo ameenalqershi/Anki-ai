@@ -1,40 +1,54 @@
 import 'package:english_mentor_ai2/presentation/widgets/reaction_bar.dart';
 import 'package:english_mentor_ai2/providers/chat_provider.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:swipe_to/swipe_to.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/local_data_source.dart';
 import '../widgets/chat_message_bubble.dart';
 import '../widgets/chat_input_bar.dart';
 import '../widgets/telegram_album_bubble.dart';
+import 'package:swipe_to/swipe_to.dart';
 
-class ChatScreen extends StatefulWidget {
+class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({super.key});
 
   @override
-  State<ChatScreen> createState() => _ChatScreenState();
+  ConsumerState<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+class _ChatScreenState extends ConsumerState<ChatScreen> {
   final ScrollController _scrollController = ScrollController();
   ChatMessage? _replyTo;
   bool _showJumpToBottom = false;
+  bool _isLoadingMore = false;
 
   @override
   void initState() {
     super.initState();
+    // تحميل أول دفعة عند الدخول
     Future.microtask(
-      () => Provider.of<ChatProvider>(context, listen: false).loadMessages(),
+      () => ref.read(chatProvider.notifier).loadInitialMessages(),
     );
+    _scrollController.addListener(_onScroll);
+  }
 
-    _scrollController.addListener(() {
-      final threshold = 260.0;
-      if (_scrollController.offset > threshold && !_showJumpToBottom) {
-        setState(() => _showJumpToBottom = true);
-      } else if (_scrollController.offset <= threshold && _showJumpToBottom) {
-        setState(() => _showJumpToBottom = false);
-      }
-    });
+  void _onScroll() {
+    final threshold = 260.0;
+    if (_scrollController.offset > threshold && !_showJumpToBottom) {
+      setState(() => _showJumpToBottom = true);
+    } else if (_scrollController.offset <= threshold && _showJumpToBottom) {
+      setState(() => _showJumpToBottom = false);
+    }
+
+    // Paging: عند السحب لأعلى
+    if (_scrollController.position.pixels <=
+            _scrollController.position.minScrollExtent + 40 &&
+        !_isLoadingMore &&
+        ref.read(chatProvider).hasMore) {
+      _isLoadingMore = true;
+      ref.read(chatProvider.notifier).loadMoreMessages().then((_) {
+        _isLoadingMore = false;
+      });
+    }
   }
 
   void _scrollToBottom() {
@@ -52,7 +66,7 @@ class _ChatScreenState extends State<ChatScreen> {
     String? fileName,
     int? fileSize,
     String? replyToId,
-    ChatProvider provider,
+    // لن يتم استخدامه مع Riverpod لكن متوافق مع ChatInputBar الحالي
   ) {
     final newMsg = ChatMessage(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -65,8 +79,8 @@ class _ChatScreenState extends State<ChatScreen> {
       fileSize: fileSize,
       replyToMessageId: replyToId,
     );
+    ref.read(chatProvider.notifier).sendMessage(newMsg);
     setState(() {
-      provider.sendMessage(newMsg);
       _replyTo = null;
     });
     Future.delayed(const Duration(milliseconds: 120), _scrollToBottom);
@@ -158,17 +172,15 @@ class _ChatScreenState extends State<ChatScreen> {
               message: msg,
               onAddReaction: (reaction) {
                 final userId = "me"; // استبدلها بمعرف المستخدم الحقيقي لديك
-                Provider.of<ChatProvider>(
-                  context,
-                  listen: false,
-                ).addReaction(msg.id, reaction, userId);
+                ref
+                    .read(chatProvider.notifier)
+                    .addReaction(msg.id, reaction, userId);
               },
               onRemoveReaction: (reaction) {
                 final userId = "me"; // استبدلها بمعرف المستخدم الحقيقي لديك
-                Provider.of<ChatProvider>(
-                  context,
-                  listen: false,
-                ).removeReaction(msg.id, reaction, userId);
+                ref
+                    .read(chatProvider.notifier)
+                    .removeReaction(msg.id, reaction, userId);
               },
             ),
           ),
@@ -183,8 +195,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final chatProvider = Provider.of<ChatProvider>(context);
-    final messages = chatProvider.messages;
+    final chatState = ref.watch(chatProvider);
+    final messages = chatState.messages;
     final bubbles = buildChatBubbles(messages);
 
     return Scaffold(
@@ -223,20 +235,16 @@ class _ChatScreenState extends State<ChatScreen> {
                     itemCount: bubbles.length,
                     itemBuilder: (context, index) {
                       final bubble = bubbles[index];
-                      return RepaintBoundary(
-                        key: bubble.key,
-                        child: SwipeTo(
-                          onRightSwipe: (details) => bubble.onSwipe(),
-                          animationDuration: const Duration(milliseconds: 350),
-                          swipeSensitivity: 5,
-                          child: bubble.widget,
-                        ),
+                      return SwipeTo(
+                        onRightSwipe: (details) => bubble.onSwipe(),
+                        animationDuration: const Duration(milliseconds: 350),
+                        swipeSensitivity: 5,
+                        child: bubble.widget,
                       );
                     },
                   ),
                 ),
                 ChatInputBar(
-                  provider: chatProvider,
                   onSend: _onSend,
                   replyTo: _replyTo,
                   onCancelReply: () => setState(() => _replyTo = null),
