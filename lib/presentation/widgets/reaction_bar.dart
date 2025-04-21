@@ -19,51 +19,59 @@ class ReactionBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final myUserId = "me"; // استبدلها بمعرف المستخدم الحقيقي لديك
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // عرض الريأكشنات الموجودة
-        ...message.reactions.entries.map((entry) {
-          final emoji = entry.key;
-          final count = entry.value.length;
-          final reacted = entry.value.contains(myUserId);
-          return GestureDetector(
-            onTap: () {
-              if (reacted) {
-                onRemoveReaction(emoji);
-              } else {
-                onAddReaction(emoji);
-              }
-            },
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 2),
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-              decoration: BoxDecoration(
-                color: reacted ? Colors.orange[100] : Colors.grey[300],
-                borderRadius: BorderRadius.circular(12),
-                border:
-                    reacted
-                        ? Border.all(color: Colors.orange)
-                        : Border.all(color: Colors.transparent),
-              ),
-              child: Text('$emoji $count'),
-            ),
-          );
-        }),
-        // زر لإضافة ريأكشن جديد من القائمة
-        PopupMenuButton<String>(
-          icon: const Icon(Icons.add_reaction, size: 22),
-          onSelected: (reaction) => onAddReaction(reaction),
-          itemBuilder:
-              (_) => [
-                for (final r in availableReactions)
-                  PopupMenuItem(
-                    value: r,
-                    child: Text(r, style: const TextStyle(fontSize: 22)),
+    return RepaintBoundary(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // عرض الريأكشنات الموجودة
+          ...message.reactions.entries.map((entry) {
+            final emoji = entry.key;
+            final count = entry.value.length;
+            final reacted = entry.value.contains(myUserId);
+            return RepaintBoundary(
+              key: ValueKey('reaction_${emoji}_${message.id}'),
+              child: GestureDetector(
+                onTap: () {
+                  if (reacted) {
+                    onRemoveReaction(emoji);
+                  } else {
+                    onAddReaction(emoji);
+                  }
+                },
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 2,
                   ),
-              ],
-        ),
-      ],
+                  decoration: BoxDecoration(
+                    color: reacted ? Colors.orange[100] : Colors.grey[300],
+                    borderRadius: BorderRadius.circular(12),
+                    border:
+                        reacted
+                            ? Border.all(color: Colors.orange)
+                            : Border.all(color: Colors.transparent),
+                  ),
+                  child: Text('$emoji $count'),
+                ),
+              ),
+            );
+          }),
+          // زر لإضافة ريأكشن جديد من القائمة
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.add_reaction, size: 22),
+            onSelected: (reaction) => onAddReaction(reaction),
+            itemBuilder:
+                (_) => [
+                  for (final r in availableReactions)
+                    PopupMenuItem(
+                      value: r,
+                      child: Text(r, style: const TextStyle(fontSize: 22)),
+                    ),
+                ],
+          ),
+        ],
+      ),
     );
   }
 }

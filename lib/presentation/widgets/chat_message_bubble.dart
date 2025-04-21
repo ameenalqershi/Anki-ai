@@ -1,5 +1,6 @@
 import 'package:english_mentor_ai2/data/local_data_source.dart';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'telegram_image_viewer.dart';
 
 class ChatMessageBubble extends StatelessWidget {
@@ -7,8 +8,6 @@ class ChatMessageBubble extends StatelessWidget {
   final ChatMessage? repliedMsg;
   final VoidCallback? onLongPress;
   final Function(ChatMessage)? onReply;
-
-  // أضف هذا المتغير لتمرير ReactionBar كودجت مباشرة من الشاشة
   final Widget? reactionBar;
 
   const ChatMessageBubble({
@@ -17,7 +16,7 @@ class ChatMessageBubble extends StatelessWidget {
     this.repliedMsg,
     this.onLongPress,
     this.onReply,
-    this.reactionBar, // متغير الريأكشن بار
+    this.reactionBar,
   });
 
   @override
@@ -35,21 +34,29 @@ class ChatMessageBubble extends StatelessWidget {
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Padding(
         padding: bubbleMargin,
-        child: Column(
-          crossAxisAlignment:
-              isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            GestureDetector(
-              onLongPress: onLongPress,
-              child: _buildByType(context),
-            ),
-            if (reactionBar != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 3),
-                child: reactionBar!,
+        child: RepaintBoundary(
+          child: Column(
+            crossAxisAlignment:
+                isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              GestureDetector(
+                onLongPress: onLongPress,
+                child: _buildByType(context),
               ),
-          ],
+              if (reactionBar != null)
+                const Padding(
+                  padding: EdgeInsets.only(top: 3),
+                  child:
+                      null, // سيتم استبدال null بـ reactionBar! في السطر التالي
+                ),
+              if (reactionBar != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 3),
+                  child: reactionBar!,
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -151,22 +158,20 @@ class ChatMessageBubble extends StatelessWidget {
                 minWidth: 120,
                 minHeight: 120,
               ),
-              child: Image.network(
-                msg.mediaUrl!,
+              child: CachedNetworkImage(
+                imageUrl: msg.mediaUrl!,
                 fit: BoxFit.cover,
-                loadingBuilder: (context, child, progress) {
-                  if (progress == null) return child;
-                  return Container(
-                    color: Colors.grey[200],
-                    height: 180,
-                    width: 240,
-                    child: const Center(
-                      child: CircularProgressIndicator(strokeWidth: 1),
+                placeholder:
+                    (context, url) => Container(
+                      color: Colors.grey[200],
+                      height: 180,
+                      width: 240,
+                      child: const Center(
+                        child: CircularProgressIndicator(strokeWidth: 1),
+                      ),
                     ),
-                  );
-                },
-                errorBuilder:
-                    (context, error, stackTrace) => Container(
+                errorWidget:
+                    (context, url, error) => Container(
                       color: Colors.grey,
                       height: 180,
                       width: 240,

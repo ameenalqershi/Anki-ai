@@ -73,8 +73,8 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   /// تحليل وتجميع رسائل الصور المتتالية كـBubble واحدة
-  List<Widget> buildChatBubbles(List<ChatMessage> messages) {
-    final List<Widget> bubbles = [];
+  List<_BubbleData> buildChatBubbles(List<ChatMessage> messages) {
+    final List<_BubbleData> bubbles = [];
     int i = 0;
 
     while (i < messages.length) {
@@ -95,12 +95,9 @@ class _ChatScreenState extends State<ChatScreen> {
         // إذا أكثر من صورة، استخدم TelegramAlbumBubble
         if (albumUrls.length > 1) {
           bubbles.add(
-            SwipeTo(
-              onRightSwipe: (details) => setState(() => _replyTo = msg),
-              animationDuration: const Duration(milliseconds: 350),
-              swipeSensitivity: 5,
-              // يمكنك التحكم في السحب بإرجاع الرسالة دون تنفيذ شيء إذا لم تتجاوز الحد
-              child: TelegramAlbumBubble(
+            _BubbleData(
+              key: ValueKey('album_${msg.id}'),
+              widget: TelegramAlbumBubble(
                 imageUrls: albumUrls,
                 isMe: msg.isMe,
                 bottomWidget: Row(
@@ -125,6 +122,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   ],
                 ),
               ),
+              onSwipe: () => setState(() => _replyTo = msg),
             ),
           );
           i = j;
@@ -149,17 +147,13 @@ class _ChatScreenState extends State<ChatScreen> {
               : null;
 
       bubbles.add(
-        SwipeTo(
-          onRightSwipe: (details) => setState(() => _replyTo = msg),
-          animationDuration: const Duration(milliseconds: 350),
-          swipeSensitivity: 5,
-          // يمكنك التحكم في السحب بإرجاع الرسالة دون تنفيذ شيء إذا لم تتجاوز الحد
-          child: ChatMessageBubble(
+        _BubbleData(
+          key: ValueKey(msg.id),
+          widget: ChatMessageBubble(
             msg: msg,
             repliedMsg: repliedMsg,
             onLongPress: () => setState(() => _replyTo = msg),
             onReply: (replyMsg) => setState(() => _replyTo = replyMsg),
-            // --- بداية كود التفاعل مع الريأكشنات ---
             reactionBar: ReactionBar(
               message: msg,
               onAddReaction: (reaction) {
@@ -177,8 +171,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 ).removeReaction(msg.id, reaction, userId);
               },
             ),
-            // --- نهاية كود التفاعل مع الريأكشنات ---
           ),
+          onSwipe: () => setState(() => _replyTo = msg),
         ),
       );
       i++;
@@ -190,8 +184,8 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     final chatProvider = Provider.of<ChatProvider>(context);
-
     final messages = chatProvider.messages;
+    final bubbles = buildChatBubbles(messages);
 
     return Scaffold(
       backgroundColor: const Color(0xffe5ebee),
@@ -221,11 +215,24 @@ class _ChatScreenState extends State<ChatScreen> {
             child: Column(
               children: [
                 Expanded(
-                  child: ListView(
+                  child: ListView.builder(
+                    key: const PageStorageKey('chat_list'),
                     controller: _scrollController,
                     reverse: true,
                     padding: const EdgeInsets.symmetric(vertical: 8),
-                    children: buildChatBubbles(messages),
+                    itemCount: bubbles.length,
+                    itemBuilder: (context, index) {
+                      final bubble = bubbles[index];
+                      return RepaintBoundary(
+                        key: bubble.key,
+                        child: SwipeTo(
+                          onRightSwipe: (details) => bubble.onSwipe(),
+                          animationDuration: const Duration(milliseconds: 350),
+                          swipeSensitivity: 5,
+                          child: bubble.widget,
+                        ),
+                      );
+                    },
                   ),
                 ),
                 ChatInputBar(
@@ -252,4 +259,12 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
     );
   }
+}
+
+// كلاس مساعد لجمع بيانات الفقاعة
+class _BubbleData {
+  final Key key;
+  final Widget widget;
+  final VoidCallback onSwipe;
+  _BubbleData({required this.key, required this.widget, required this.onSwipe});
 }

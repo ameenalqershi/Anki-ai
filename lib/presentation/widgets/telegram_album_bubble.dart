@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 // استورد العارض الخاص بك
 import 'telegram_image_viewer.dart';
@@ -87,7 +88,7 @@ class TelegramAlbumBubble extends StatelessWidget {
                       allUrls: urls,
                     ),
                   ),
-                  SizedBox(width: gap),
+                  const SizedBox(width: gap),
                   Expanded(
                     flex: 1,
                     child: Column(
@@ -157,23 +158,21 @@ class TelegramAlbumBubble extends StatelessWidget {
       },
       child: ClipRRect(
         borderRadius: radius ?? BorderRadius.zero,
-        child: Image.network(
-          url,
+        child: CachedNetworkImage(
+          imageUrl: url,
           fit: BoxFit.cover,
           width: double.infinity,
           height: double.infinity,
           alignment: Alignment.center,
-          loadingBuilder: (context, child, loadingProgress) {
-            if (loadingProgress == null) return child;
-            return Container(
-              color: Colors.grey[200],
-              child: const Center(
-                child: CircularProgressIndicator(strokeWidth: 1),
+          placeholder:
+              (context, url) => Container(
+                color: Colors.grey[200],
+                child: const Center(
+                  child: CircularProgressIndicator(strokeWidth: 1),
+                ),
               ),
-            );
-          },
-          errorBuilder:
-              (context, error, stackTrace) => Container(
+          errorWidget:
+              (context, url, error) => Container(
                 color: Colors.grey,
                 child: const Icon(Icons.broken_image),
               ),
